@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const PRIORITIES = {
   high:   { label: "緊急", color: "#FF4444", bg: "#FF444418" },
@@ -63,7 +63,16 @@ export default function SalesTodoCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [view, setView]       = useState("month");
-  const [todos, setTodos]     = useState(INITIAL_TODOS);
+  const [todos, setTodos] = useState(() => {
+    try {
+      const saved = localStorage.getItem("sales-todos");
+      return saved ? JSON.parse(saved) : INITIAL_TODOS;
+    } catch { return INITIAL_TODOS; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("sales-todos", JSON.stringify(todos)); } catch {}
+  }, [todos]);
   const [showModal, setShowModal] = useState(false);
   const [editTodo, setEditTodo]   = useState(null);
   const [form, setForm] = useState({ title:"", date:todayStr, priority:"medium", category:"followup", note:"" });
