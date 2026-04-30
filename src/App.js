@@ -1,4 +1,18 @@
 import { useState, useEffect } from "react";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+
+// ── Firebase設定 ──────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyB5eSZLCsrCCuUKXdmKwZyUxqlNbPBpZoI",
+  authDomain: "eatin-map-ee417.firebaseapp.com",
+  projectId: "eatin-map-ee417",
+  storageBucket: "eatin-map-ee417.firebasestorage.app",
+  messagingSenderId: "850029980093",
+  appId: "1:850029980093:web:bd2ea9a6e942b342220ad4"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
 
 // ── 定数 ──────────────────────────────────────────────
 const PRIORITIES = {
@@ -29,7 +43,6 @@ const DAYS_JP   = ["日","月","火","水","木","金","土"];
 const MONTHS_JP = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
 
 // ── ユーティリティ ────────────────────────────────────
-function genId()  { return Math.random().toString(36).slice(2,9); }
 function makeDateStr(y,m,d) { return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
 function addDays(str,n) { const d=new Date(str); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
 function fmtDate(str) { const d=new Date(str); return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`; }
@@ -38,52 +51,43 @@ function catColor(key) { return PRODUCT_CATEGORIES[key]?.color ?? "#94A3B8"; }
 const today    = new Date();
 const todayStr = today.toISOString().slice(0,10);
 
-const INITIAL_TODOS = [
-  { id:genId(), title:"株式会社ABC 初回アポ",  date:todayStr,            priority:"high",   category:"prospect",   done:false, note:"代表取締役と面談" },
-  { id:genId(), title:"山田商事 ニュース提案",  date:todayStr,            priority:"high",   category:"news",       done:false, note:"電子版プランで" },
-  { id:genId(), title:"佐藤工業 COS更新確認",   date:todayStr,            priority:"medium", category:"cos",        done:false, note:"" },
-  { id:genId(), title:"加盟料 鈴木商事",        date:addDays(todayStr,1), priority:"high",   category:"membership", done:false, note:"来月末期限" },
-  { id:genId(), title:"ATTパッケージ提案",      date:addDays(todayStr,1), priority:"medium", category:"att",        done:false, note:"" },
-  { id:genId(), title:"NET切替フォロー",        date:addDays(todayStr,2), priority:"medium", category:"net",        done:false, note:"3社まとめて" },
-  { id:genId(), title:"チケット案内 田中社",    date:addDays(todayStr,2), priority:"low",    category:"ticket",     done:false, note:"野球シーズン" },
-  { id:genId(), title:"週次レポート作成",       date:addDays(todayStr,3), priority:"low",    category:"admin",      done:false, note:"" },
-];
-
 // ── メインコンポーネント ──────────────────────────────
 export default function App() {
-  // タブ: "list" | "calendar"
-  const [tab, setTab] = useState("list");
-
-  // カレンダービュー: "month" | "3day" | "day"
-  const [calView, setCalView]     = useState("month");
+  const [tab, setTab]           = useState("list");
+  const [calView, setCalView]   = useState("month");
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
-  // TODO データ
-  const [todos, setTodos] = useState(() => {
-    try { const s=localStorage.getItem("sales-todos"); return s ? JSON.parse(s) : INITIAL_TODOS; }
-    catch { return INITIAL_TODOS; }
-  });
+  // Firestore リアルタイム同期
+  const [todos, setTodos]   = useState([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    try { localStorage.setItem("sales-todos", JSON.stringify(todos)); } catch {}
-  }, [todos]);
+    const unsub = onSnapshot(collection(db, "sales_todos"), (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTodos(data);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
 
   // モーダル
   const [showModal, setShowModal] = useState(false);
   const [editTodo,  setEditTodo]  = useState(null);
   const [form, setForm] = useState({ title:"", date:todayStr, priority:"medium", category:"followup", note:"" });
+  const [saving, setSaving] = useState(false);
 
-  // フィルター（一覧タブ用）
-  const [listFilter,  setListFilter]  = useState("all");   // "all"|"done"|"undone"
+  // フィルター（一覧）
+  const [listFilter,    setListFilter]    = useState("all");
   const [listCatFilter, setListCatFilter] = useState("all");
-  const [listSort,    setListSort]    = useState("date");   // "date"|"priority"
-  const [listCatTab,  setListCatTab]  = useState("action");
+  const [listSort,      setListSort]      = useState("date");
+  const [listCatTab,    setListCatTab]    = useState("action");
 
-  // カレンダー日次フィルター
+  // フィルター（カレンダー日次）
   const [calCatFilter, setCalCatFilter] = useState("all");
   const [calCatTab,    setCalCatTab]    = useState("action");
 
-  // ── CRUD ──────────────────────────────────────────
+  // ── CRUD (Firestore) ──────────────────────────────
   function openAdd(ds) {
     setEditTodo(null);
     setForm({ title:"", date:ds||todayStr, priority:"medium", category:"followup", note:"" });
@@ -94,17 +98,26 @@ export default function App() {
     setForm({ title:todo.title, date:todo.date, priority:todo.priority, category:todo.category, note:todo.note });
     setShowModal(true);
   }
-  function saveTodo() {
+  async function saveTodo() {
     if (!form.title.trim()) return;
-    if (editTodo) {
-      setTodos(todos.map(t => t.id===editTodo.id ? {...t,...form} : t));
-    } else {
-      setTodos([...todos, { id:genId(), ...form, done:false }]);
-    }
-    setShowModal(false);
+    setSaving(true);
+    try {
+      if (editTodo) {
+        await updateDoc(doc(db, "sales_todos", editTodo.id), form);
+      } else {
+        await addDoc(collection(db, "sales_todos"), { ...form, done: false });
+      }
+      setShowModal(false);
+    } catch(e) { alert("保存に失敗しました: " + e.message); }
+    setSaving(false);
   }
-  function toggleDone(id) { setTodos(todos.map(t => t.id===id ? {...t,done:!t.done} : t)); }
-  function deleteTodo(id) { setTodos(todos.filter(t => t.id!==id)); }
+  async function toggleDone(todo) {
+    await updateDoc(doc(db, "sales_todos", todo.id), { done: !todo.done });
+  }
+  async function deleteTodo(id) {
+    if (!window.confirm("削除しますか？")) return;
+    await deleteDoc(doc(db, "sales_todos", id));
+  }
 
   // ── カレンダー計算 ────────────────────────────────
   const year  = currentDate.getFullYear();
@@ -121,21 +134,21 @@ export default function App() {
   const monthPrefix = `${year}-${String(month+1).padStart(2,"0")}`;
   const monthTodos  = todos.filter(t=>t.date.startsWith(monthPrefix));
   const stats = {
-    total: todos.length,
-    done:  todos.filter(t=>t.done).length,
-    high:  todos.filter(t=>t.priority==="high"&&!t.done).length,
+    total:      todos.length,
+    done:       todos.filter(t=>t.done).length,
+    high:       todos.filter(t=>t.priority==="high"&&!t.done).length,
     monthTotal: monthTodos.length,
   };
   const completionRate = stats.total>0 ? Math.round((stats.done/stats.total)*100) : 0;
 
-  // ── 一覧フィルタ済みリスト ────────────────────────
+  // ── 一覧フィルタ ──────────────────────────────────
   let listTodos = [...todos];
   if (listFilter==="done")   listTodos = listTodos.filter(t=>t.done);
   if (listFilter==="undone") listTodos = listTodos.filter(t=>!t.done);
   if (listCatFilter!=="all") listTodos = listTodos.filter(t=>t.category===listCatFilter);
   if (listSort==="date")     listTodos.sort((a,b)=>a.date.localeCompare(b.date));
   if (listSort==="priority") {
-    const rank = {high:0,medium:1,low:2};
+    const rank={high:0,medium:1,low:2};
     listTodos.sort((a,b)=>rank[a.priority]-rank[b.priority]);
   }
 
@@ -150,7 +163,7 @@ export default function App() {
     outline:"none", boxSizing:"border-box", fontFamily:"inherit",
   };
 
-  // ── TodoCard（共通） ──────────────────────────────
+  // ── TodoCard ─────────────────────────────────────
   function TodoCard({ todo, showDate=false }) {
     const cat = ALL_CATEGORIES[todo.category]||{label:todo.category,icon:"•"};
     const cc  = catColor(todo.category);
@@ -161,7 +174,7 @@ export default function App() {
         opacity:todo.done?0.55:1,
         display:"flex", alignItems:"flex-start", gap:11,
       }}>
-        <button onClick={()=>toggleDone(todo.id)} style={{
+        <button onClick={()=>toggleDone(todo)} style={{
           width:22, height:22, borderRadius:"50%", flexShrink:0, marginTop:2,
           border:`2px solid ${todo.done?"#34C759":PRIORITIES[todo.priority].color}`,
           background:todo.done?"#34C759":"transparent",
@@ -177,9 +190,9 @@ export default function App() {
             <span style={{fontSize:10, padding:"2px 7px", borderRadius:20, fontWeight:700, background:cc+"18", color:cc}}>
               {cat.icon} {cat.label}
             </span>
-            {showDate && <span style={{fontSize:11, color:"#7A7D8A"}}>{fmtDate(todo.date)} {DAYS_JP[new Date(todo.date).getDay()]}曜</span>}
+            {showDate&&<span style={{fontSize:11, color:"#7A7D8A"}}>{fmtDate(todo.date)} {DAYS_JP[new Date(todo.date).getDay()]}曜</span>}
           </div>
-          {todo.note && <div style={{fontSize:12, color:"#7A7D8A", marginTop:3}}>{todo.note}</div>}
+          {todo.note&&<div style={{fontSize:12, color:"#7A7D8A", marginTop:3}}>{todo.note}</div>}
         </div>
         <div style={{display:"flex", gap:5, flexShrink:0}}>
           <button onClick={()=>openEdit(todo)} style={{background:"#1E2230", border:"none", borderRadius:6, width:28, height:28, cursor:"pointer", color:"#7A7D8A", fontSize:13}}>✏️</button>
@@ -257,6 +270,18 @@ export default function App() {
   }
 
   // ════════════════════════════════════════════════════
+  if (loading) return (
+    <div style={{minHeight:"100vh", background:"#0D0F14", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16}}>
+      <div style={{
+        width:40, height:40, borderRadius:"50%",
+        border:"3px solid #2A2D3A", borderTop:"3px solid #FFD700",
+        animation:"spin 0.8s linear infinite",
+      }}/>
+      <div style={{color:"#7A7D8A", fontSize:13}}>データを読み込み中...</div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+
   return (
     <div style={{minHeight:"100vh", background:"#0D0F14", fontFamily:"'Noto Sans JP','Hiragino Sans',sans-serif", color:"#E8EAF0"}}>
 
@@ -278,7 +303,6 @@ export default function App() {
               <div style={{fontSize:10, color:"#7A7D8A", letterSpacing:"0.1em"}}>TOP PERFORMER BOARD</div>
             </div>
           </div>
-          {/* タブ */}
           <div style={{display:"flex", gap:5}}>
             {[["list","📋 一覧"],["calendar","📅 カレンダー"]].map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)} style={{
@@ -316,7 +340,6 @@ export default function App() {
         {/* ════════ 一覧タブ ════════ */}
         {tab==="list" && (
           <div>
-            {/* ソート・ステータスフィルター */}
             <div style={{display:"flex", gap:8, marginBottom:12, alignItems:"center", flexWrap:"wrap"}}>
               <div style={{display:"flex", gap:5}}>
                 {[["all","すべて"],["undone","未完了"],["done","完了済"]].map(([v,l])=>(
@@ -338,19 +361,10 @@ export default function App() {
                 ))}
               </div>
             </div>
-
-            {/* カテゴリフィルター */}
-            <CatFilterBar
-              catTab={listCatTab} setCatTab={setListCatTab}
-              catFilter={listCatFilter} setCatFilter={setListCatFilter}
-            />
-
-            {/* 件数 */}
+            <CatFilterBar catTab={listCatTab} setCatTab={setListCatTab} catFilter={listCatFilter} setCatFilter={setListCatFilter}/>
             <div style={{fontSize:12, color:"#5A5D6A", marginBottom:10}}>{listTodos.length}件</div>
-
-            {/* リスト */}
             <div style={{display:"flex", flexDirection:"column", gap:9}}>
-              {listTodos.length===0 && (
+              {listTodos.length===0&&(
                 <div style={{background:"#1A1D26", borderRadius:14, padding:"36px 20px", textAlign:"center", color:"#7A7D8A", border:"1px dashed #2A2D3A"}}>
                   <div style={{fontSize:28, marginBottom:8}}>📭</div>
                   <div>タスクなし</div>
@@ -364,7 +378,6 @@ export default function App() {
         {/* ════════ カレンダータブ ════════ */}
         {tab==="calendar" && (
           <div>
-            {/* カレンダービュー切り替え */}
             <div style={{display:"flex", gap:5, marginBottom:14}}>
               {[["month","月次"],["3day","3日"],["day","日次"]].map(([v,l])=>(
                 <button key={v} onClick={()=>setCalView(v)} style={{
@@ -375,8 +388,8 @@ export default function App() {
               ))}
             </div>
 
-            {/* ─── 月次 ─── */}
-            {calView==="month" && (
+            {/* 月次 */}
+            {calView==="month"&&(
               <div style={{background:"#1A1D26", borderRadius:18, border:"1px solid #2A2D3A", overflow:"hidden"}}>
                 <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 17px", borderBottom:"1px solid #2A2D3A"}}>
                   <button onClick={()=>setCurrentDate(new Date(year,month-1,1))} style={{background:"#12151E", border:"1px solid #2A2D3A", borderRadius:8, width:30, height:30, cursor:"pointer", color:"#E8EAF0", fontSize:16}}>‹</button>
@@ -390,13 +403,12 @@ export default function App() {
                 </div>
                 <div style={{display:"grid", gridTemplateColumns:"repeat(7,1fr)"}}>
                   {calendarDays.map((d,i)=>{
-                    if (!d) return <div key={`e${i}`} style={{minHeight:70, borderRight:"1px solid #1E2230", borderBottom:"1px solid #1E2230"}}/>;
-                    const ds      = makeDateStr(year,month,d);
-                    const dt      = todosFor(ds);
-                    const isToday = ds===todayStr;
-                    const isSel   = ds===selectedDate;
-                    const dow     = (firstDay+d-1)%7;
-                    const hasHigh = dt.some(t=>t.priority==="high"&&!t.done);
+                    if(!d) return <div key={`e${i}`} style={{minHeight:70, borderRight:"1px solid #1E2230", borderBottom:"1px solid #1E2230"}}/>;
+                    const ds=makeDateStr(year,month,d);
+                    const dt=todosFor(ds);
+                    const isToday=ds===todayStr, isSel=ds===selectedDate;
+                    const dow=(firstDay+d-1)%7;
+                    const hasHigh=dt.some(t=>t.priority==="high"&&!t.done);
                     return (
                       <div key={d} onClick={()=>{setSelectedDate(ds);setCalView("day");}} style={{
                         minHeight:70, padding:"5px", cursor:"pointer",
@@ -415,15 +427,7 @@ export default function App() {
                         </div>
                         {dt.slice(0,2).map(t=>{
                           const cc=catColor(t.category);
-                          return (
-                            <div key={t.id} style={{
-                              fontSize:9, padding:"1px 4px", borderRadius:3, marginBottom:2,
-                              background:cc+"20", color:cc, opacity:t.done?0.4:1,
-                              overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis",
-                            }}>
-                              {ALL_CATEGORIES[t.category]?.icon} {t.title}
-                            </div>
-                          );
+                          return <div key={t.id} style={{fontSize:9, padding:"1px 4px", borderRadius:3, marginBottom:2, background:cc+"20", color:cc, opacity:t.done?0.4:1, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{ALL_CATEGORIES[t.category]?.icon} {t.title}</div>;
                         })}
                         {dt.length>2&&<div style={{fontSize:9,color:"#7A7D8A"}}>+{dt.length-2}</div>}
                       </div>
@@ -433,8 +437,8 @@ export default function App() {
               </div>
             )}
 
-            {/* ─── 3日 ─── */}
-            {calView==="3day" && (
+            {/* 3日 */}
+            {calView==="3day"&&(
               <div>
                 <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12}}>
                   <button onClick={()=>setSelectedDate(addDays(selectedDate,-3))} style={{background:"#1A1D26", border:"1px solid #2A2D3A", borderRadius:8, padding:"6px 13px", cursor:"pointer", color:"#E8EAF0", fontSize:13}}>‹ 前3日</button>
@@ -443,10 +447,7 @@ export default function App() {
                 </div>
                 <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10}}>
                   {threeDays.map(ds=>{
-                    const dt      = todosFor(ds);
-                    const d       = new Date(ds);
-                    const dow     = d.getDay();
-                    const isToday = ds===todayStr;
+                    const dt=todosFor(ds), d=new Date(ds), dow=d.getDay(), isToday=ds===todayStr;
                     return (
                       <div key={ds} style={{background:"#1A1D26", borderRadius:14, border:isToday?"1px solid #FFD70060":"1px solid #2A2D3A", overflow:"hidden"}}>
                         <div style={{padding:"10px 12px", borderBottom:"1px solid #2A2D3A", background:isToday?"#FFD70010":"transparent", display:"flex", alignItems:"center", gap:6}}>
@@ -460,14 +461,9 @@ export default function App() {
                         <div style={{padding:"8px", display:"flex", flexDirection:"column", gap:6}}>
                           {dt.length===0&&<div style={{textAlign:"center", color:"#3A3D4A", fontSize:11, padding:"10px 0"}}>タスクなし</div>}
                           {dt.map(t=>{
-                            const cc=catColor(t.category);
-                            const cat=ALL_CATEGORIES[t.category];
+                            const cc=catColor(t.category), cat=ALL_CATEGORIES[t.category];
                             return (
-                              <div key={t.id} onClick={()=>{setSelectedDate(ds);setCalView("day");}} style={{
-                                background:"#12151E", borderRadius:8, padding:"8px 10px",
-                                border:`1px solid ${t.done?"#2A2D3A":PRIORITIES[t.priority].color+"40"}`,
-                                opacity:t.done?0.5:1, cursor:"pointer",
-                              }}>
+                              <div key={t.id} onClick={()=>{setSelectedDate(ds);setCalView("day");}} style={{background:"#12151E", borderRadius:8, padding:"8px 10px", border:`1px solid ${t.done?"#2A2D3A":PRIORITIES[t.priority].color+"40"}`, opacity:t.done?0.5:1, cursor:"pointer"}}>
                                 <div style={{fontSize:12, fontWeight:600, marginBottom:3, textDecoration:t.done?"line-through":"none", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{t.title}</div>
                                 <div style={{display:"flex", gap:4}}>
                                   <span style={{fontSize:9, padding:"1px 5px", borderRadius:10, background:PRIORITIES[t.priority].bg, color:PRIORITIES[t.priority].color, fontWeight:700}}>{PRIORITIES[t.priority].label}</span>
@@ -485,8 +481,8 @@ export default function App() {
               </div>
             )}
 
-            {/* ─── 日次 ─── */}
-            {calView==="day" && (
+            {/* 日次 */}
+            {calView==="day"&&(
               <div>
                 <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:13}}>
                   <button onClick={()=>setSelectedDate(addDays(selectedDate,-1))} style={{background:"#1A1D26", border:"1px solid #2A2D3A", borderRadius:8, padding:"6px 13px", cursor:"pointer", color:"#E8EAF0", fontSize:13}}>‹ 前日</button>
@@ -525,31 +521,21 @@ export default function App() {
         display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, zIndex:200,
       }}>+</button>
 
-      {/* ════════ モーダル ════════ */}
+      {/* モーダル */}
       {showModal&&(
-        <div style={{
-          position:"fixed", inset:0, background:"#000000BB",
-          display:"flex", alignItems:"center", justifyContent:"center",
-          zIndex:300, padding:16,
-        }} onClick={e=>e.target===e.currentTarget&&setShowModal(false)}>
-          <div style={{
-            background:"#1A1D26", borderRadius:20, padding:22, width:"100%", maxWidth:440,
-            border:"1px solid #2A2D3A", maxHeight:"92vh", overflowY:"auto",
-          }}>
+        <div style={{position:"fixed", inset:0, background:"#000000BB", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300, padding:16}}
+          onClick={e=>e.target===e.currentTarget&&setShowModal(false)}>
+          <div style={{background:"#1A1D26", borderRadius:20, padding:22, width:"100%", maxWidth:440, border:"1px solid #2A2D3A", maxHeight:"92vh", overflowY:"auto"}}>
             <div style={{fontWeight:800, fontSize:17, marginBottom:18}}>{editTodo?"タスク編集":"タスク追加"}</div>
             <div style={{display:"flex", flexDirection:"column", gap:13}}>
-
               <div>
                 <label style={{fontSize:11, color:"#7A7D8A", display:"block", marginBottom:5}}>タスク名</label>
-                <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})}
-                  placeholder="例：山田商事 提案書作成" style={inputStyle}/>
+                <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="例：山田商事 提案書作成" style={inputStyle}/>
               </div>
-
               <div>
                 <label style={{fontSize:11, color:"#7A7D8A", display:"block", marginBottom:5}}>日付</label>
                 <input type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} style={inputStyle}/>
               </div>
-
               <div>
                 <label style={{fontSize:11, color:"#7A7D8A", display:"block", marginBottom:5}}>優先度</label>
                 <div style={{display:"flex", gap:8}}>
@@ -562,25 +548,16 @@ export default function App() {
                   ))}
                 </div>
               </div>
-
               <CategoryPicker/>
-
               <div>
                 <label style={{fontSize:11, color:"#7A7D8A", display:"block", marginBottom:5}}>メモ</label>
-                <textarea value={form.note} onChange={e=>setForm({...form,note:e.target.value})}
-                  rows={2} placeholder="補足メモ..." style={{...inputStyle,resize:"none"}}/>
+                <textarea value={form.note} onChange={e=>setForm({...form,note:e.target.value})} rows={2} placeholder="補足メモ..." style={{...inputStyle,resize:"none"}}/>
               </div>
-
               <div style={{display:"flex", gap:10, marginTop:2}}>
-                <button onClick={()=>setShowModal(false)} style={{
-                  flex:1, padding:"11px", borderRadius:12, border:"1px solid #2A2D3A",
-                  background:"transparent", color:"#7A7D8A", cursor:"pointer", fontSize:13, fontWeight:600,
-                }}>キャンセル</button>
-                <button onClick={saveTodo} style={{
-                  flex:2, padding:"11px", borderRadius:12, border:"none",
-                  background:"linear-gradient(135deg,#FFD700,#FF8C00)",
-                  color:"#0D0F14", cursor:"pointer", fontSize:13, fontWeight:800,
-                }}>保存する</button>
+                <button onClick={()=>setShowModal(false)} style={{flex:1, padding:"11px", borderRadius:12, border:"1px solid #2A2D3A", background:"transparent", color:"#7A7D8A", cursor:"pointer", fontSize:13, fontWeight:600}}>キャンセル</button>
+                <button onClick={saveTodo} disabled={saving} style={{flex:2, padding:"11px", borderRadius:12, border:"none", background:saving?"#2A2D3A":"linear-gradient(135deg,#FFD700,#FF8C00)", color:saving?"#7A7D8A":"#0D0F14", cursor:saving?"not-allowed":"pointer", fontSize:13, fontWeight:800}}>
+                  {saving?"保存中...":"保存する"}
+                </button>
               </div>
             </div>
           </div>
