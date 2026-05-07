@@ -43,6 +43,36 @@ const DAYS_JP   = ["日","月","火","水","木","金","土"];
 const MONTHS_JP = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
 
 // ── ユーティリティ ────────────────────────────────────
+
+// ── Excel出力（今西さん提出用） ────────────────────────
+function exportToExcel(todos) {
+  const header = ["日付", "曜日", "タスク内容", "種類", "完了"];
+  const rows = [...todos]
+    .sort((a,b) => a.date.localeCompare(b.date))
+    .map(t => {
+      const d   = new Date(t.date);
+      const cat = ALL_CATEGORIES[t.category];
+      return [
+        t.date,
+        DAYS_JP[d.getDay()] + "曜日",
+        t.title,
+        (cat?.label || t.category),
+        t.done ? "済" : "未",
+      ];
+    });
+  const bom  = "﻿";
+  const csv  = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("
+");
+  const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  const now  = new Date();
+  a.href = url;
+  a.download = `タスク一覧_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,"0")}${String(now.getDate()).padStart(2,"0")}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function makeDateStr(y,m,d) { return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
 function addDays(str,n) { const d=new Date(str); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
 function fmtDate(str) { const d=new Date(str); return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`; }
@@ -303,7 +333,7 @@ export default function App() {
               <div style={{fontSize:10, color:"#7A7D8A", letterSpacing:"0.1em"}}>TOP PERFORMER BOARD</div>
             </div>
           </div>
-          <div style={{display:"flex", gap:5}}>
+          <div style={{display:"flex", gap:5, alignItems:"center"}}>
             {[["list","📋 一覧"],["calendar","📅 カレンダー"]].map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)} style={{
                 padding:"7px 16px", borderRadius:9, border:"none", cursor:"pointer", fontSize:13, fontWeight:700,
@@ -311,6 +341,10 @@ export default function App() {
                 color:tab===t?"#0D0F14":"#7A7D8A", transition:"all 0.2s",
               }}>{l}</button>
             ))}
+            <button onClick={()=>exportToExcel(todos)} style={{
+              padding:"7px 13px", borderRadius:9, border:"1px solid #34D39960", cursor:"pointer", fontSize:12, fontWeight:700,
+              background:"#34D39918", color:"#34D399", display:"flex", alignItems:"center", gap:5, whiteSpace:"nowrap",
+            }}>📥 今西さん提出用</button>
           </div>
         </div>
       </div>
