@@ -51,7 +51,6 @@ function exportToExcel(todos) {
     .sort((a,b) => a.date.localeCompare(b.date))
     .map(t => {
       const d   = new Date(t.date);
-      const cat = ALL_CATEGORIES[t.category];
       return [
         t.date,
         DAYS_JP[d.getDay()] + "曜日",
@@ -197,8 +196,6 @@ export default function App() {
 
   // ── TodoCard ─────────────────────────────────────
   function TodoCard({ todo, showDate=false }) {
-    const cat = ALL_CATEGORIES[todo.category]||{label:todo.category,icon:"•"};
-    const cc  = catColor(todo.category);
     return (
       <div style={{
         background:"#1A1D26", borderRadius:14, padding:"13px 15px",
@@ -515,7 +512,6 @@ export default function App() {
                         <div style={{padding:"8px", display:"flex", flexDirection:"column", gap:6}}>
                           {dt.length===0&&<div style={{textAlign:"center", color:"#3A3D4A", fontSize:11, padding:"10px 0"}}>タスクなし</div>}
                           {dt.map(t=>{
-                            const cc=catColor(t.category), cat=ALL_CATEGORIES[t.category];
                             return (
                               <div key={t.id} onClick={()=>{setSelectedDate(ds);setCalView("day");}} style={{background:"#12151E", borderRadius:8, padding:"8px 10px", border:`1px solid ${t.done?"#2A2D3A":PRIORITIES[t.priority].color+"40"}`, opacity:t.done?0.5:1, cursor:"pointer"}}>
                                 <div style={{fontSize:12, fontWeight:600, marginBottom:3, textDecoration:t.done?"line-through":"none", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{t.title}</div>
