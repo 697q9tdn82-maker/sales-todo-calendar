@@ -205,11 +205,12 @@ export default function App() {
   // ── TodoCard ─────────────────────────────────────
   function TodoCard({ todo, showDate=false }) {
     return (
-      <div style={{
+      <div onDoubleClick={()=>openEdit(todo)} style={{
         background:"#1A1D26", borderRadius:14, padding:"13px 15px",
         border:`1px solid ${todo.done?"#2A2D3A":PRIORITIES[todo.priority].color+"50"}`,
         opacity:todo.done?0.55:1,
         display:"flex", alignItems:"flex-start", gap:11,
+        cursor:"pointer",
       }}>
         <button onClick={()=>toggleDone(todo)} style={{
           width:22, height:22, borderRadius:"50%", flexShrink:0, marginTop:2,
