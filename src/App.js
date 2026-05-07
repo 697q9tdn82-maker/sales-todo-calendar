@@ -52,6 +52,7 @@ function exportToExcel(todos) {
     .map(t => {
       const d   = new Date(t.date);
       const cat = ALL_CATEGORIES[t.category];
+      const q   = String.fromCharCode(34);
       return [
         t.date,
         DAYS_JP[d.getDay()] + "曜日",
@@ -60,15 +61,17 @@ function exportToExcel(todos) {
         t.done ? "済" : "未",
       ];
     });
-  const bom  = "﻿";
-  const csv  = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("
-");
-  const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+  const BOM = "\uFEFF";
+  const escape = (v) => String.fromCharCode(34) + String(v).replace(/"/g, '""') + String.fromCharCode(34);
+  const csv = [header, ...rows].map(r => r.map(escape).join(",")).join("\r\n");
+  const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8;" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   const now  = new Date();
   a.href = url;
-  a.download = `タスク一覧_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,"0")}${String(now.getDate()).padStart(2,"0")}.csv`;
+  a.download = "\u30bf\u30b9\u30af\u4e00\u89a7_" + now.getFullYear()
+    + String(now.getMonth()+1).padStart(2,"0")
+    + String(now.getDate()).padStart(2,"0") + ".csv";
   a.click();
   URL.revokeObjectURL(url);
 }
