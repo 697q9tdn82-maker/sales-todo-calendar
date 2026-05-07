@@ -341,10 +341,6 @@ export default function App() {
                 color:tab===t?"#0D0F14":"#7A7D8A", transition:"all 0.2s",
               }}>{l}</button>
             ))}
-            <button onClick={()=>exportToExcel(todos)} style={{
-              padding:"7px 13px", borderRadius:9, border:"1px solid #34D39960", cursor:"pointer", fontSize:12, fontWeight:700,
-              background:"#34D39918", color:"#34D399", display:"flex", alignItems:"center", gap:5, whiteSpace:"nowrap",
-            }}>📥 今西さん提出用</button>
           </div>
         </div>
       </div>
@@ -396,7 +392,13 @@ export default function App() {
               </div>
             </div>
             <CatFilterBar catTab={listCatTab} setCatTab={setListCatTab} catFilter={listCatFilter} setCatFilter={setListCatFilter}/>
-            <div style={{fontSize:12, color:"#5A5D6A", marginBottom:10}}>{listTodos.length}件</div>
+            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
+              <div style={{fontSize:12, color:"#5A5D6A"}}>{listTodos.length}件</div>
+              <button onClick={()=>exportToExcel(todos)} style={{
+                padding:"7px 14px", borderRadius:9, border:"1px solid #34D39960", cursor:"pointer", fontSize:12, fontWeight:700,
+                background:"#34D39918", color:"#34D399", display:"flex", alignItems:"center", gap:5,
+              }}>📥 今西さん提出用</button>
+            </div>
             <div style={{display:"flex", flexDirection:"column", gap:9}}>
               {listTodos.length===0&&(
                 <div style={{background:"#1A1D26", borderRadius:14, padding:"36px 20px", textAlign:"center", color:"#7A7D8A", border:"1px dashed #2A2D3A"}}>
