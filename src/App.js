@@ -52,7 +52,6 @@ function exportToExcel(todos) {
     .map(t => {
       const d   = new Date(t.date);
       const cat = ALL_CATEGORIES[t.category];
-      const q   = String.fromCharCode(34);
       return [
         t.date,
         DAYS_JP[d.getDay()] + "曜日",
