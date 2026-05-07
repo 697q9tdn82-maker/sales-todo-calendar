@@ -56,7 +56,7 @@ function exportToExcel(todos) {
         t.date,
         DAYS_JP[d.getDay()] + "曜日",
         t.title,
-        (cat?.label || t.category),
+        (Array.isArray(t.categories)&&t.categories.length>0 ? t.categories.map(ck=>ALL_CATEGORIES[ck]?.label||ck).join('・') : (t.category?ALL_CATEGORIES[t.category]?.label||t.category:'')),
         t.done ? "済" : "未",
       ];
     });
@@ -106,7 +106,7 @@ export default function App() {
   // モーダル
   const [showModal, setShowModal] = useState(false);
   const [editTodo,  setEditTodo]  = useState(null);
-  const [form, setForm] = useState({ title:"", date:todayStr, priority:"medium", category:"followup", note:"" });
+  const [form, setForm] = useState({ title:"", date:todayStr, priority:"medium", categories:[], note:"" });
   const [saving, setSaving] = useState(false);
 
   // フィルター（一覧）
@@ -122,12 +122,12 @@ export default function App() {
   // ── CRUD (Firestore) ──────────────────────────────
   function openAdd(ds) {
     setEditTodo(null);
-    setForm({ title:"", date:ds||todayStr, priority:"medium", category:"followup", note:"" });
+    setForm({ title:"", date:ds||todayStr, priority:"medium", categories:[], note:"" });
     setShowModal(true);
   }
   function openEdit(todo) {
     setEditTodo(todo);
-    setForm({ title:todo.title, date:todo.date, priority:todo.priority, category:todo.category, note:todo.note });
+    setForm({ title:todo.title, date:todo.date, priority:todo.priority, categories:Array.isArray(todo.categories)?todo.categories:(todo.category?[todo.category]:[]), note:todo.note });
     setShowModal(true);
   }
   async function saveTodo() {
@@ -219,9 +219,16 @@ export default function App() {
             <span style={{fontSize:10, padding:"2px 7px", borderRadius:20, fontWeight:700, background:PRIORITIES[todo.priority].bg, color:PRIORITIES[todo.priority].color}}>
               {PRIORITIES[todo.priority].label}
             </span>
-            <span style={{fontSize:10, padding:"2px 7px", borderRadius:20, fontWeight:700, background:cc+"18", color:cc}}>
-              {cat.icon} {cat.label}
-            </span>
+            {(()=>{
+              const cats = Array.isArray(todo.categories)&&todo.categories.length>0 ? todo.categories : (todo.category?[todo.category]:[]);
+              return cats.length===0
+                ? null
+                : cats.map(ck=>{
+                    const c=ALL_CATEGORIES[ck]; if(!c) return null;
+                    const cc2=catColor(ck);
+                    return <span key={ck} style={{fontSize:10, padding:"2px 7px", borderRadius:20, fontWeight:700, background:cc2+"18", color:cc2}}>{c.icon} {c.label}</span>;
+                  });
+            })()}
             {showDate&&<span style={{fontSize:11, color:"#7A7D8A"}}>{fmtDate(todo.date)} {DAYS_JP[new Date(todo.date).getDay()]}曜</span>}
           </div>
           {todo.note&&<div style={{fontSize:12, color:"#7A7D8A", marginTop:3}}>{todo.note}</div>}
@@ -268,28 +275,36 @@ export default function App() {
     );
   }
 
-  // ── モーダル内カテゴリ選択 ────────────────────────
+  // ── モーダル内カテゴリ選択（複数選択対応） ──────────
   function CategoryPicker() {
+    function toggleCat(k) {
+      const cats = form.categories || [];
+      const next = cats.includes(k) ? cats.filter(c=>c!==k) : [...cats, k];
+      setForm({...form, categories: next});
+    }
     return (
       <div>
-        <label style={{fontSize:11, color:"#7A7D8A", display:"block", marginBottom:8}}>カテゴリ</label>
+        <label style={{fontSize:11, color:"#7A7D8A", display:"block", marginBottom:4}}>カテゴリ <span style={{color:"#5A5D6A", fontWeight:400}}>(複数選択・選択なしもOK)</span></label>
         <div style={{fontSize:10, color:"#5A5D6A", marginBottom:5}}>営業アクション</div>
         <div style={{display:"flex", gap:6, flexWrap:"wrap", marginBottom:10}}>
-          {Object.entries(ACTION_CATEGORIES).map(([k,v])=>(
-            <button key={k} onClick={()=>setForm({...form,category:k})} style={{
-              padding:"5px 10px", borderRadius:16, border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
-              background:form.category===k?"#2A2D3A":"#12151E",
-              color:form.category===k?"#E8EAF0":"#5A5D6A",
-              outline:form.category===k?"1px solid #4FC3F7":"none",
-            }}>{v.icon} {v.label}</button>
-          ))}
+          {Object.entries(ACTION_CATEGORIES).map(([k,v])=>{
+            const active=(form.categories||[]).includes(k);
+            return (
+              <button key={k} onClick={()=>toggleCat(k)} style={{
+                padding:"5px 10px", borderRadius:16, border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
+                background:active?"#2A2D3A":"#12151E",
+                color:active?"#E8EAF0":"#5A5D6A",
+                outline:active?"1px solid #4FC3F7":"none",
+              }}>{v.icon} {v.label}</button>
+            );
+          })}
         </div>
         <div style={{fontSize:10, color:"#5A5D6A", marginBottom:5}}>商品</div>
         <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
           {Object.entries(PRODUCT_CATEGORIES).map(([k,v])=>{
-            const active=form.category===k;
+            const active=(form.categories||[]).includes(k);
             return (
-              <button key={k} onClick={()=>setForm({...form,category:k})} style={{
+              <button key={k} onClick={()=>toggleCat(k)} style={{
                 padding:"5px 10px", borderRadius:16, border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
                 background:active?v.color+"18":"#12151E", color:active?v.color:"#5A5D6A",
                 outline:active?`1px solid ${v.color}`:"none",
@@ -464,8 +479,9 @@ export default function App() {
                           {hasHigh&&<span style={{position:"absolute",top:-1,right:-1,width:6,height:6,borderRadius:"50%",background:"#FF4444"}}/>}
                         </div>
                         {dt.slice(0,2).map(t=>{
-                          const cc=catColor(t.category);
-                          return <div key={t.id} style={{fontSize:9, padding:"1px 4px", borderRadius:3, marginBottom:2, background:cc+"20", color:cc, opacity:t.done?0.4:1, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{ALL_CATEGORIES[t.category]?.icon} {t.title}</div>;
+                          const cats=Array.isArray(t.categories)&&t.categories.length>0?t.categories:(t.category?[t.category]:[]);
+                          const firstCat=cats[0]; const cc=catColor(firstCat);
+                          return <div key={t.id} style={{fontSize:9, padding:"1px 4px", borderRadius:3, marginBottom:2, background:cc+"20", color:cc, opacity:t.done?0.4:1, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{ALL_CATEGORIES[firstCat]?.icon} {t.title}</div>;
                         })}
                         {dt.length>2&&<div style={{fontSize:9,color:"#7A7D8A"}}>+{dt.length-2}</div>}
                       </div>
@@ -505,7 +521,10 @@ export default function App() {
                                 <div style={{fontSize:12, fontWeight:600, marginBottom:3, textDecoration:t.done?"line-through":"none", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{t.title}</div>
                                 <div style={{display:"flex", gap:4}}>
                                   <span style={{fontSize:9, padding:"1px 5px", borderRadius:10, background:PRIORITIES[t.priority].bg, color:PRIORITIES[t.priority].color, fontWeight:700}}>{PRIORITIES[t.priority].label}</span>
-                                  <span style={{fontSize:9, padding:"1px 5px", borderRadius:10, background:cc+"18", color:cc}}>{cat?.icon} {cat?.label}</span>
+                                  {(()=>{
+                                const cats3=Array.isArray(t.categories)&&t.categories.length>0?t.categories:(t.category?[t.category]:[]);
+                                return cats3.slice(0,2).map(ck=>{const c3=ALL_CATEGORIES[ck];const cc3=catColor(ck);return c3?<span key={ck} style={{fontSize:9, padding:"1px 5px", borderRadius:10, background:cc3+"18", color:cc3}}>{c3.icon} {c3.label}</span>:null;});
+                              })()}
                                 </div>
                               </div>
                             );
