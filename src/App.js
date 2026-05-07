@@ -38,7 +38,15 @@ const PRODUCT_CATEGORIES = {
   ticket:     { label: "チケット", icon: "🎟️", color: "#FB923C" },
 };
 
-const ALL_CATEGORIES = { ...ACTION_CATEGORIES, ...PRODUCT_CATEGORIES };
+const CONTACT_CATEGORIES = {
+  tel_office: { label: "事務所電話", icon: "☎️", color: "#818CF8" },
+  tel_mobile: { label: "携帯電話",   icon: "📱", color: "#34D399" },
+  email:      { label: "メール",     icon: "✉️", color: "#60A5FA" },
+  line:       { label: "LINE",       icon: "💬", color: "#4ADE80" },
+  other:      { label: "その他",     icon: "💡", color: "#94A3B8" },
+};
+
+const ALL_CATEGORIES = { ...ACTION_CATEGORIES, ...PRODUCT_CATEGORIES, ...CONTACT_CATEGORIES };
 const DAYS_JP   = ["日","月","火","水","木","金","土"];
 const MONTHS_JP = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
 
@@ -77,7 +85,7 @@ function exportToExcel(todos) {
 function makeDateStr(y,m,d) { return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
 function addDays(str,n) { const d=new Date(str); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
 function fmtDate(str) { const d=new Date(str); return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`; }
-function catColor(key) { return PRODUCT_CATEGORIES[key]?.color ?? "#94A3B8"; }
+function catColor(key) { return PRODUCT_CATEGORIES[key]?.color ?? CONTACT_CATEGORIES[key]?.color ?? "#94A3B8"; }
 
 const today    = new Date();
 const todayStr = today.toISOString().slice(0,10);
@@ -243,7 +251,7 @@ export default function App() {
     return (
       <div style={{marginBottom:12}}>
         <div style={{display:"flex", gap:6, marginBottom:7, alignItems:"center"}}>
-          {[["action","営業アクション"],["product","商品"]].map(([t,l])=>(
+          {[["action","営業アクション"],["product","商品"],["contact","連絡手段"]].map(([t,l])=>(
             <button key={t} onClick={()=>setCatTab(t)} style={{
               padding:"4px 11px", borderRadius:6, border:"none", cursor:"pointer", fontSize:11, fontWeight:700,
               background:catTab===t?"#2A2D3A":"transparent", color:catTab===t?"#E8EAF0":"#5A5D6A",
@@ -255,7 +263,7 @@ export default function App() {
           }}>すべて</button>
         </div>
         <div style={{display:"flex", gap:5, flexWrap:"wrap"}}>
-          {Object.entries(catTab==="action"?ACTION_CATEGORIES:PRODUCT_CATEGORIES).map(([key,cat])=>{
+          {Object.entries(catTab==="action"?ACTION_CATEGORIES:catTab==="product"?PRODUCT_CATEGORIES:CONTACT_CATEGORIES).map(([key,cat])=>{
             const active=catFilter===key;
             const cc=catColor(key);
             return (
@@ -297,8 +305,21 @@ export default function App() {
           })}
         </div>
         <div style={{fontSize:10, color:"#5A5D6A", marginBottom:5}}>商品</div>
-        <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+        <div style={{display:"flex", gap:6, flexWrap:"wrap", marginBottom:10}}>
           {Object.entries(PRODUCT_CATEGORIES).map(([k,v])=>{
+            const active=(form.categories||[]).includes(k);
+            return (
+              <button key={k} onClick={()=>toggleCat(k)} style={{
+                padding:"5px 10px", borderRadius:16, border:"none", cursor:"pointer", fontSize:11, fontWeight:600,
+                background:active?v.color+"18":"#12151E", color:active?v.color:"#5A5D6A",
+                outline:active?`1px solid ${v.color}`:"none",
+              }}>{v.icon} {v.label}</button>
+            );
+          })}
+        </div>
+        <div style={{fontSize:10, color:"#5A5D6A", marginBottom:5}}>連絡手段</div>
+        <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+          {Object.entries(CONTACT_CATEGORIES).map(([k,v])=>{
             const active=(form.categories||[]).includes(k);
             return (
               <button key={k} onClick={()=>toggleCat(k)} style={{
