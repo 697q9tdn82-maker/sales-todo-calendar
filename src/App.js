@@ -21,6 +21,12 @@ const PRIORITIES = {
   low:    { label: "通常", color: "#34C759", bg: "#34C75918" },
 };
 
+const STATUSES = {
+  undone:   { label: "未",    color: "#94A3B8", bg: "#94A3B818", icon: "○" },
+  progress: { label: "着手中", color: "#FBBF24", bg: "#FBBF2418", icon: "◑" },
+  done:     { label: "済",    color: "#34C759", bg: "#34C75918", icon: "✓" },
+};
+
 const ACTION_CATEGORIES = {
   prospect: { label: "新規開拓", icon: "🎯" },
   followup: { label: "フォロー", icon: "📞" },
@@ -64,7 +70,7 @@ function exportToExcel(todos) {
         DAYS_JP[d.getDay()] + "曜日",
         t.title,
         (Array.isArray(t.categories)&&t.categories.length>0 ? t.categories.map(ck=>ALL_CATEGORIES[ck]?.label||ck).join('・') : (t.category?ALL_CATEGORIES[t.category]?.label||t.category:'')),
-        t.done ? "済" : "未",
+        (STATUSES[t.status||(t.done?"done":"undone")]||STATUSES.undone).label,
       ];
     });
   const BOM = "\uFEFF";
@@ -113,7 +119,7 @@ export default function App() {
   // モーダル
   const [showModal, setShowModal] = useState(false);
   const [editTodo,  setEditTodo]  = useState(null);
-  const [form, setForm] = useState({ title:"", date:todayStr, priority:"medium", categories:[], note:"" });
+  const [form, setForm] = useState({ title:"", date:new Date().toISOString().slice(0,10), priority:"medium", categories:[], status:"undone", note:"" });
   const [saving, setSaving] = useState(false);
 
   // フィルター（一覧）
@@ -129,12 +135,12 @@ export default function App() {
   // ── CRUD (Firestore) ──────────────────────────────
   function openAdd(ds) {
     setEditTodo(null);
-    setForm({ title:"", date:ds||todayStr, priority:"medium", categories:[], note:"" });
+    setForm({ title:"", date:new Date().toISOString().slice(0,10), priority:"medium", categories:[], status:"undone", note:"" });
     setShowModal(true);
   }
   function openEdit(todo) {
     setEditTodo(todo);
-    setForm({ title:todo.title, date:todo.date, priority:todo.priority, categories:Array.isArray(todo.categories)?todo.categories:(todo.category?[todo.category]:[]), note:todo.note });
+    setForm({ title:todo.title, date:todo.date, priority:todo.priority, categories:Array.isArray(todo.categories)?todo.categories:(todo.category?[todo.category]:[]), status:todo.status||(todo.done?"done":"undone"), note:todo.note });
     setShowModal(true);
   }
   async function saveTodo() {
@@ -142,16 +148,19 @@ export default function App() {
     setSaving(true);
     try {
       if (editTodo) {
-        await updateDoc(doc(db, "sales_todos", editTodo.id), form);
+        await updateDoc(doc(db, "sales_todos", editTodo.id), { ...form, done: form.status==="done" });
       } else {
-        await addDoc(collection(db, "sales_todos"), { ...form, done: false });
+        await addDoc(collection(db, "sales_todos"), { ...form, done: form.status==="done" });
       }
       setShowModal(false);
     } catch(e) { alert("保存に失敗しました: " + e.message); }
     setSaving(false);
   }
-  async function toggleDone(todo) {
-    await updateDoc(doc(db, "sales_todos", todo.id), { done: !todo.done });
+  async function cycleStatus(todo) {
+    const order = ["undone","progress","done"];
+    const cur   = todo.status || (todo.done ? "done" : "undone");
+    const next  = order[(order.indexOf(cur)+1) % order.length];
+    await updateDoc(doc(db, "sales_todos", todo.id), { status: next, done: next==="done" });
   }
   async function deleteTodo(id) {
     if (!window.confirm("削除しますか？")) return;
@@ -174,16 +183,17 @@ export default function App() {
   const monthTodos  = todos.filter(t=>t.date.startsWith(monthPrefix));
   const stats = {
     total:      todos.length,
-    done:       todos.filter(t=>t.done).length,
-    high:       todos.filter(t=>t.priority==="high"&&!t.done).length,
+    done:       todos.filter(t=>t.status==="done"||t.done).length,
+    high:       todos.filter(t=>t.priority==="high"&&t.status!=="done"&&!t.done).length,
     monthTotal: monthTodos.length,
   };
   const completionRate = stats.total>0 ? Math.round((stats.done/stats.total)*100) : 0;
 
   // ── 一覧フィルタ ──────────────────────────────────
   let listTodos = [...todos];
-  if (listFilter==="done")   listTodos = listTodos.filter(t=>t.done);
-  if (listFilter==="undone") listTodos = listTodos.filter(t=>!t.done);
+  if (listFilter==="done")     listTodos = listTodos.filter(t=>t.status==="done"||t.done);
+  if (listFilter==="progress") listTodos = listTodos.filter(t=>t.status==="progress");
+  if (listFilter==="undone")   listTodos = listTodos.filter(t=>!t.status||t.status==="undone");
   if (listCatFilter!=="all") listTodos = listTodos.filter(t=>t.category===listCatFilter);
   if (listSort==="date")     listTodos.sort((a,b)=>a.date.localeCompare(b.date));
   if (listSort==="priority") {
@@ -192,8 +202,10 @@ export default function App() {
   }
 
   // ── カレンダー日次フィルタ ────────────────────────
+  const priorityRank={high:0,medium:1,low:2};
   const dayTodos = (calCatFilter==="all" ? todos : todos.filter(t=>t.category===calCatFilter))
-    .filter(t=>t.date===selectedDate);
+    .filter(t=>t.date===selectedDate)
+    .sort((a,b)=>priorityRank[a.priority]-priorityRank[b.priority]);
 
   // ── 共通スタイル ──────────────────────────────────
   const inputStyle = {
@@ -207,24 +219,29 @@ export default function App() {
     return (
       <div onDoubleClick={()=>openEdit(todo)} style={{
         background:"#1A1D26", borderRadius:14, padding:"13px 15px",
-        border:`1px solid ${todo.done?"#2A2D3A":PRIORITIES[todo.priority].color+"50"}`,
-        opacity:todo.done?0.55:1,
+        border:`1px solid ${(todo.status==="done"||todo.done)?"#2A2D3A":PRIORITIES[todo.priority].color+"50"}`,
+        opacity:(todo.status==="done"||todo.done)?0.55:1,
         display:"flex", alignItems:"flex-start", gap:11,
         cursor:"pointer",
       }}>
-        <button onClick={()=>toggleDone(todo)} style={{
-          width:22, height:22, borderRadius:"50%", flexShrink:0, marginTop:2,
-          border:`2px solid ${todo.done?"#34C759":PRIORITIES[todo.priority].color}`,
-          background:todo.done?"#34C759":"transparent",
-          cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-          color:"#fff", fontSize:12,
-        }}>{todo.done?"✓":""}</button>
+        {(()=>{
+          const st=STATUSES[todo.status||(todo.done?"done":"undone")]||STATUSES.undone;
+          return (
+            <button onClick={()=>cycleStatus(todo)} title="クリックでステータス切替" style={{
+              width:22, height:22, borderRadius:"50%", flexShrink:0, marginTop:2,
+              border:`2px solid ${st.color}`, background:st.bg,
+              cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+              color:st.color, fontSize:11, fontWeight:700,
+            }}>{st.icon}</button>
+          );
+        })()}
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex", alignItems:"center", gap:6, flexWrap:"wrap"}}>
-            <span style={{fontSize:14, fontWeight:600, textDecoration:todo.done?"line-through":"none"}}>{todo.title}</span>
+            <span style={{fontSize:14, fontWeight:600, textDecoration:(todo.status==="done"||todo.done)?"line-through":"none"}}>{todo.title}</span>
             <span style={{fontSize:10, padding:"2px 7px", borderRadius:20, fontWeight:700, background:PRIORITIES[todo.priority].bg, color:PRIORITIES[todo.priority].color}}>
               {PRIORITIES[todo.priority].label}
             </span>
+            {(()=>{const st=STATUSES[todo.status||(todo.done?"done":"undone")]||STATUSES.undone; return <span style={{fontSize:10, padding:"2px 7px", borderRadius:20, fontWeight:700, background:st.bg, color:st.color}}>{st.icon} {st.label}</span>; })()}
             {(()=>{
               const cats = Array.isArray(todo.categories)&&todo.categories.length>0 ? todo.categories : (todo.category?[todo.category]:[]);
               return cats.length===0
@@ -408,7 +425,7 @@ export default function App() {
           <div>
             <div style={{display:"flex", gap:8, marginBottom:12, alignItems:"center", flexWrap:"wrap"}}>
               <div style={{display:"flex", gap:5}}>
-                {[["all","すべて"],["undone","未完了"],["done","完了済"]].map(([v,l])=>(
+                {[["all","すべて"],["undone","未"],["progress","着手中"],["done","済"]].map(([v,l])=>(
                   <button key={v} onClick={()=>setListFilter(v)} style={{
                     padding:"5px 12px", borderRadius:16, border:"none", cursor:"pointer", fontSize:12, fontWeight:600,
                     background:listFilter===v?"#FFD700":"#1A1D26",
@@ -620,6 +637,18 @@ export default function App() {
                       background:form.priority===k?v.bg:"#12151E", color:form.priority===k?v.color:"#5A5D6A",
                       outline:form.priority===k?`1px solid ${v.color}`:"none",
                     }}>{v.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{fontSize:11, color:"#7A7D8A", display:"block", marginBottom:5}}>ステータス</label>
+                <div style={{display:"flex", gap:8}}>
+                  {Object.entries(STATUSES).map(([k,v])=>(
+                    <button key={k} onClick={()=>setForm({...form,status:k})} style={{
+                      flex:1, padding:"8px", borderRadius:8, border:"none", cursor:"pointer", fontSize:12, fontWeight:700,
+                      background:form.status===k?v.bg:"#12151E", color:form.status===k?v.color:"#5A5D6A",
+                      outline:form.status===k?`1px solid ${v.color}`:"none",
+                    }}>{v.icon} {v.label}</button>
                   ))}
                 </div>
               </div>
