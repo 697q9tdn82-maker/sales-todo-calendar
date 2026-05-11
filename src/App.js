@@ -89,18 +89,22 @@ function exportToExcel(todos) {
 }
 
 function makeDateStr(y,m,d) { return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
+function toJSTDateStr(d) {
+  const jst = new Date(d.getTime() + 9*60*60*1000);
+  return jst.toISOString().slice(0,10);
+}
 function addDays(str,n) { const d=new Date(str); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
 function fmtDate(str) { const d=new Date(str); return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`; }
 function catColor(key) { return PRODUCT_CATEGORIES[key]?.color ?? CONTACT_CATEGORIES[key]?.color ?? "#94A3B8"; }
 
 const today    = new Date();
-const todayStr = today.toISOString().slice(0,10);
+const todayStr = toJSTDateStr(today);
 
 // ── メインコンポーネント ──────────────────────────────
 export default function App() {
   const [tab, setTab]           = useState("list");
   const [calView, setCalView]   = useState("month");
-  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1)); // JSTベース
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
   // Firestore リアルタイム同期
@@ -119,7 +123,7 @@ export default function App() {
   // モーダル
   const [showModal, setShowModal] = useState(false);
   const [editTodo,  setEditTodo]  = useState(null);
-  const [form, setForm] = useState({ title:"", date:new Date().toISOString().slice(0,10), priority:"medium", categories:[], status:"undone", note:"" });
+  const [form, setForm] = useState({ title:"", date:toJSTDateStr(new Date()), priority:"medium", categories:[], status:"undone", note:"" });
   const [saving, setSaving] = useState(false);
 
   // フィルター（一覧）
@@ -135,7 +139,7 @@ export default function App() {
   // ── CRUD (Firestore) ──────────────────────────────
   function openAdd(ds) {
     setEditTodo(null);
-    setForm({ title:"", date:new Date().toISOString().slice(0,10), priority:"medium", categories:[], status:"undone", note:"" });
+    setForm({ title:"", date:toJSTDateStr(new Date()), priority:"medium", categories:[], status:"undone", note:"" });
     setShowModal(true);
   }
   function openEdit(todo) {
@@ -200,12 +204,16 @@ export default function App() {
     const rank={high:0,medium:1,low:2};
     listTodos.sort((a,b)=>rank[a.priority]-rank[b.priority]);
   }
+  // 済みは常に末尾
+  const isDone = t => t.status==="done" || t.done;
+  listTodos.sort((a,b) => isDone(a)===isDone(b) ? 0 : isDone(a) ? 1 : -1);
 
   // ── カレンダー日次フィルタ ────────────────────────
   const priorityRank={high:0,medium:1,low:2};
   const dayTodos = (calCatFilter==="all" ? todos : todos.filter(t=>t.category===calCatFilter))
     .filter(t=>t.date===selectedDate)
-    .sort((a,b)=>priorityRank[a.priority]-priorityRank[b.priority]);
+    .sort((a,b)=>priorityRank[a.priority]-priorityRank[b.priority])
+    .sort((a,b)=>{ const d=s=>s.status==="done"||s.done; return d(a)===d(b)?0:d(a)?1:-1; });
 
   // ── 共通スタイル ──────────────────────────────────
   const inputStyle = {
