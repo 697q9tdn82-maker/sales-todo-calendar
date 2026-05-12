@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
+import * as XLSX from "xlsx";
 import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 
 // ── Firebase設定 ──────────────────────────────────────
@@ -60,32 +61,82 @@ const MONTHS_JP = ["1月","2月","3月","4月","5月","6月","7月","8月","9月
 
 // ── Excel出力（今西さん提出用） ────────────────────────
 function exportToExcel(todos) {
-  const header = ["日付", "曜日", "タスク内容", "種類", "完了"];
+  // ── データ生成 ──────────────────────────────────────
+  const headers = ["日付", "曜日", "タスク内容", "営業アクション", "商品区分", "連絡手段", "完了"];
   const rows = [...todos]
     .sort((a,b) => a.date.localeCompare(b.date))
     .map(t => {
-      const d   = new Date(t.date);
+      const d    = new Date(t.date);
+      const cats = Array.isArray(t.categories)&&t.categories.length>0
+        ? t.categories
+        : (t.category ? [t.category] : []);
+      const actions  = cats.filter(k=>ACTION_CATEGORIES[k]).map(k=>ACTION_CATEGORIES[k].label).join("・");
+      const products = cats.filter(k=>PRODUCT_CATEGORIES[k]).map(k=>PRODUCT_CATEGORIES[k].label).join("・");
+      const contacts = cats.filter(k=>CONTACT_CATEGORIES[k]).map(k=>CONTACT_CATEGORIES[k].label).join("・");
       return [
         t.date,
         DAYS_JP[d.getDay()] + "曜日",
         t.title,
-        (Array.isArray(t.categories)&&t.categories.length>0 ? t.categories.map(ck=>ALL_CATEGORIES[ck]?.label||ck).join('・') : (t.category?ALL_CATEGORIES[t.category]?.label||t.category:'')),
+        actions,
+        products,
+        contacts,
         (STATUSES[t.status||(t.done?"done":"undone")]||STATUSES.undone).label,
       ];
     });
-  const BOM = "\uFEFF";
-  const escape = (v) => String.fromCharCode(34) + String(v).replace(/"/g, '""') + String.fromCharCode(34);
-  const csv = [header, ...rows].map(r => r.map(escape).join(",")).join("\r\n");
-  const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8;" });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  const now  = new Date();
-  a.href = url;
-  a.download = "\u30bf\u30b9\u30af\u4e00\u89a7_" + now.getFullYear()
-    + String(now.getMonth()+1).padStart(2,"0")
-    + String(now.getDate()).padStart(2,"0") + ".csv";
-  a.click();
-  URL.revokeObjectURL(url);
+
+  // ── ワークシート作成 ────────────────────────────────
+  const wsData = [headers, ...rows];
+  const ws     = XLSX.utils.aoa_to_sheet(wsData);
+
+  // ── 列幅設定 ───────────────────────────────────────
+  ws["!cols"] = [
+    { wch: 12 }, // 日付
+    { wch: 8  }, // 曜日
+    { wch: 36 }, // タスク内容
+    { wch: 16 }, // 営業アクション
+    { wch: 14 }, // 商品区分
+    { wch: 14 }, // 連絡手段
+    { wch: 8  }, // 完了
+  ];
+
+  // ── 行高さ設定 ─────────────────────────────────────
+  ws["!rows"] = wsData.map(() => ({ hpt: 18 }));
+
+  // ── タイトル行スタイル（薄い青塗りつぶし） ──────────
+  const titleFill = { patternType: "solid", fgColor: { rgb: "BDD7EE" } };
+  const titleFont = { bold: true, color: { rgb: "1F3864" } };
+  const titleBorder = {
+    top:    { style: "thin", color: { rgb: "9DC3E6" } },
+    bottom: { style: "thin", color: { rgb: "9DC3E6" } },
+    left:   { style: "thin", color: { rgb: "9DC3E6" } },
+    right:  { style: "thin", color: { rgb: "9DC3E6" } },
+  };
+  headers.forEach((_, i) => {
+    const cell = XLSX.utils.encode_cell({ r: 0, c: i });
+    if (!ws[cell]) return;
+    ws[cell].s = { fill: titleFill, font: titleFont, border: titleBorder, alignment: { horizontal: "center", vertical: "center" } };
+  });
+
+  // ── データ行のボーダー ─────────────────────────────
+  const dataBorder = {
+    top:    { style: "thin", color: { rgb: "D9D9D9" } },
+    bottom: { style: "thin", color: { rgb: "D9D9D9" } },
+    left:   { style: "thin", color: { rgb: "D9D9D9" } },
+    right:  { style: "thin", color: { rgb: "D9D9D9" } },
+  };
+  rows.forEach((_, ri) => {
+    headers.forEach((_, ci) => {
+      const cell = XLSX.utils.encode_cell({ r: ri+1, c: ci });
+      if (!ws[cell]) ws[cell] = { t: "s", v: "" };
+      ws[cell].s = { border: dataBorder, alignment: { vertical: "center", wrapText: false } };
+    });
+  });
+
+  // ── ワークブック出力 ────────────────────────────────
+  const wb  = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "タスク一覧");
+  const now = toJSTDateStr(new Date());
+  XLSX.writeFile(wb, "タスク一覧_" + now.replace(/-/g,"") + ".xlsx");
 }
 
 function makeDateStr(y,m,d) { return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
@@ -180,7 +231,12 @@ export default function App() {
   for (let i=0;i<firstDay;i++) calendarDays.push(null);
   for (let d=1;d<=daysInMonth;d++) calendarDays.push(d);
   const threeDays = [selectedDate, addDays(selectedDate,1), addDays(selectedDate,2)];
-  const todosFor  = (ds) => todos.filter(t=>t.date===ds);
+  // 期限切れタスクは今日に引き上げて表示（ステータス問わず・データは変えない）
+  const displayDate = (t) => {
+    if (t.date < todayStr) return todayStr;
+    return t.date;
+  };
+  const todosFor  = (ds) => todos.filter(t=>displayDate(t)===ds);
 
   // ── 統計 ─────────────────────────────────────────
   const monthPrefix = `${year}-${String(month+1).padStart(2,"0")}`;
@@ -211,7 +267,7 @@ export default function App() {
   // ── カレンダー日次フィルタ ────────────────────────
   const priorityRank={high:0,medium:1,low:2};
   const dayTodos = (calCatFilter==="all" ? todos : todos.filter(t=>t.category===calCatFilter))
-    .filter(t=>t.date===selectedDate)
+    .filter(t=>displayDate(t)===selectedDate)
     .sort((a,b)=>priorityRank[a.priority]-priorityRank[b.priority])
     .sort((a,b)=>{ const d=s=>s.status==="done"||s.done; return d(a)===d(b)?0:d(a)?1:-1; });
 
