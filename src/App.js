@@ -62,8 +62,9 @@ const MONTHS_JP = ["1月","2月","3月","4月","5月","6月","7月","8月","9月
 // ── Excel出力（今西さん提出用） ────────────────────────
 function exportToExcel(todos) {
   // ── データ生成 ──────────────────────────────────────
-  const headers = ["日付", "曜日", "タスク内容", "営業アクション", "商品区分", "連絡手段", "完了"];
+  const headers = ["日付", "曜日", "タスク内容", "営業アクション", "商品区分", "連絡手段", "緊急度", "完了"];
   const rows = [...todos]
+    .filter(t => { const s = t.status||(t.done?"done":"undone"); return s==="undone"||s==="progress"; })
     .sort((a,b) => a.date.localeCompare(b.date))
     .map(t => {
       const d    = new Date(t.date);
@@ -80,6 +81,7 @@ function exportToExcel(todos) {
         actions,
         products,
         contacts,
+        (PRIORITIES[t.priority]||PRIORITIES.medium).label,
         (STATUSES[t.status||(t.done?"done":"undone")]||STATUSES.undone).label,
       ];
     });
@@ -96,6 +98,7 @@ function exportToExcel(todos) {
     { wch: 16 }, // 営業アクション
     { wch: 14 }, // 商品区分
     { wch: 14 }, // 連絡手段
+    { wch: 8  }, // 緊急度
     { wch: 8  }, // 完了
   ];
 
