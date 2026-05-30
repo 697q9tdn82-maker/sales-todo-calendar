@@ -239,6 +239,54 @@ export default function App() {
   const [todos, setTodos]   = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ── 案件パイプライン ──────────────────────────────
+  const STAGES = [
+    { key:"contact",  label:"初回接触", color:"#60A5FA" },
+    { key:"proposal", label:"提案",    color:"#FBBF24" },
+    { key:"closing",  label:"クロージング", color:"#F87171" },
+    { key:"won",      label:"成約",    color:"#34D399" },
+  ];
+  const [deals, setDeals]         = useState([]);
+  const [dealsLoading, setDealsLoading] = useState(true);
+  const [showDealModal, setShowDealModal] = useState(false);
+  const [editDeal, setEditDeal]   = useState(null);
+  const [dealForm, setDealForm]   = useState({ company:"", products:[], amount:"", person:"", note:"", stage:"contact" });
+
+  useEffect(()=>{
+    const unsub = onSnapshot(collection(db,"sales_deals"),(snap)=>{
+      setDeals(snap.docs.map(d=>({id:d.id,...d.data()})));
+      setDealsLoading(false);
+    });
+    return ()=>unsub();
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function openAddDeal(stage) {
+    setEditDeal(null);
+    setDealForm({ company:"", products:[], amount:"", person:"", note:"", stage:stage||"contact" });
+    setShowDealModal(true);
+  }
+  function openEditDeal(deal) {
+    setEditDeal(deal);
+    setDealForm({ company:deal.company||"", products:deal.products||[], amount:deal.amount||"", person:deal.person||"", note:deal.note||"", stage:deal.stage||"contact" });
+    setShowDealModal(true);
+  }
+  async function saveDeal() {
+    if (!dealForm.company.trim()) return;
+    if (editDeal) {
+      await updateDoc(doc(db,"sales_deals",editDeal.id), dealForm);
+    } else {
+      await addDoc(collection(db,"sales_deals"), { ...dealForm, createdAt: new Date().toISOString() });
+    }
+    setShowDealModal(false);
+  }
+  async function deleteDeal(id) {
+    if (!window.confirm("削除しますか？")) return;
+    await deleteDoc(doc(db,"sales_deals",id));
+  }
+  async function moveDeal(deal, stageKey) {
+    await updateDoc(doc(db,"sales_deals",deal.id), { stage: stageKey });
+  }
+
   // ── ボードデータ ──────────────────────────────────
   const PRODUCTS = [
     { key:"membership", label:"加盟料",  color:"#A78BFA" },
@@ -543,6 +591,114 @@ export default function App() {
     );
   }
 
+  // ── PipelineTab ──────────────────────────────────
+  function PipelineTab() {
+    const PROD_LIST = [
+      { key:"membership", label:"加盟料",  color:"#A78BFA" },
+      { key:"cosmos",     label:"COSMOS", color:"#34D399" },
+      { key:"news",       label:"ニュース", color:"#60A5FA" },
+    ];
+
+    function fmt(n){ const v=Number(n)||0; return v>=10000?(v/10000).toFixed(1)+"万":v>0?v.toLocaleString():"―"; }
+
+    if (dealsLoading) return <div style={{textAlign:"center",color:"#7A7D8A",padding:"40px"}}>読み込み中...</div>;
+
+    // ステージ別集計
+    const stageTotal = (stageKey) => deals
+      .filter(d=>d.stage===stageKey)
+      .reduce((s,d)=>s+(Number(d.amount)||0),0);
+
+    return (
+      <div>
+        {/* ヘッダー */}
+        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14}}>
+          <div style={{fontWeight:800, fontSize:17}}>🔀 案件パイプライン</div>
+          <button onClick={()=>openAddDeal("contact")} style={{
+            padding:"7px 16px", borderRadius:9, border:"none", cursor:"pointer", fontSize:13, fontWeight:700,
+            background:"linear-gradient(135deg,#FFD700,#FF8C00)", color:"#0D0F14",
+          }}>+ 案件追加</button>
+        </div>
+
+        {/* サマリー */}
+        <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:9, marginBottom:16}}>
+          {STAGES.map(s=>{
+            const stagDeals = deals.filter(d=>d.stage===s.key);
+            return (
+              <div key={s.key} style={{background:"#1A1D26", borderRadius:12, padding:"10px 13px", border:`1px solid ${s.color}30`}}>
+                <div style={{fontSize:10, color:s.color, fontWeight:700, marginBottom:4}}>{s.label}</div>
+                <div style={{fontSize:20, fontWeight:800, color:"#E8EAF0", lineHeight:1}}>{stagDeals.length}<span style={{fontSize:11, marginLeft:2}}>件</span></div>
+                <div style={{fontSize:11, color:"#7A7D8A", marginTop:2}}>{fmt(stageTotal(s.key))}円</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* かんばんボード */}
+        <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10}}>
+          {STAGES.map(stage=>{
+            const stageDeals = deals.filter(d=>d.stage===stage.key);
+            return (
+              <div key={stage.key} style={{background:"#1A1D26", borderRadius:14, border:`1px solid ${stage.color}30`, overflow:"hidden"}}>
+                {/* ステージヘッダー */}
+                <div style={{padding:"10px 12px", borderBottom:`1px solid ${stage.color}30`, background:stage.color+"10", display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+                  <div style={{fontWeight:700, fontSize:13, color:stage.color}}>{stage.label}</div>
+                  <div style={{background:stage.color+"20", color:stage.color, borderRadius:10, padding:"2px 8px", fontSize:11, fontWeight:700}}>{stageDeals.length}</div>
+                </div>
+                {/* 案件カード */}
+                <div style={{padding:"8px", display:"flex", flexDirection:"column", gap:7, minHeight:120}}>
+                  {stageDeals.length===0 && (
+                    <div style={{textAlign:"center", color:"#3A3D4A", fontSize:11, padding:"16px 0"}}>案件なし</div>
+                  )}
+                  {stageDeals.map(deal=>{
+                    const prods = (deal.products||[]).map(k=>PROD_LIST.find(p=>p.key===k)).filter(Boolean);
+                    return (
+                      <div key={deal.id} onDoubleClick={()=>openEditDeal(deal)} style={{
+                        background:"#12151E", borderRadius:10, padding:"10px 11px",
+                        border:"1px solid #2A2D3A", cursor:"pointer",
+                      }}>
+                        <div style={{fontWeight:700, fontSize:13, marginBottom:5, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{deal.company}</div>
+                        {/* 商品バッジ */}
+                        {prods.length>0 && (
+                          <div style={{display:"flex", gap:4, flexWrap:"wrap", marginBottom:5}}>
+                            {prods.map(p=>(
+                              <span key={p.key} style={{fontSize:9, padding:"1px 6px", borderRadius:10, background:p.color+"18", color:p.color, fontWeight:700}}>{p.label}</span>
+                            ))}
+                          </div>
+                        )}
+                        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+                          <div style={{fontSize:12, color:"#66BB6A", fontWeight:700}}>{fmt(deal.amount)}円</div>
+                          {deal.person && <div style={{fontSize:10, color:"#7A7D8A"}}>👤 {deal.person}</div>}
+                        </div>
+                        {deal.note && <div style={{fontSize:10, color:"#7A7D8A", marginTop:4, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{deal.note}</div>}
+                        {/* ステージ移動ボタン */}
+                        <div style={{display:"flex", gap:4, marginTop:7}}>
+                          {STAGES.filter(s=>s.key!==stage.key).map(s=>(
+                            <button key={s.key} onClick={e=>{e.stopPropagation();moveDeal(deal,s.key);}} style={{
+                              flex:1, padding:"3px 0", borderRadius:6, border:`1px solid ${s.color}50`,
+                              background:s.color+"10", color:s.color, cursor:"pointer", fontSize:9, fontWeight:700,
+                            }}>{s.label}</button>
+                          ))}
+                          <button onClick={e=>{e.stopPropagation();deleteDeal(deal.id);}} style={{
+                            padding:"3px 6px", borderRadius:6, border:"1px solid #FF525250",
+                            background:"#FF525210", color:"#FF5252", cursor:"pointer", fontSize:9,
+                          }}>🗑</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <button onClick={()=>openAddDeal(stage.key)} style={{
+                    width:"100%", background:"transparent", border:"1px dashed #2A2D3A",
+                    borderRadius:8, padding:"6px", cursor:"pointer", color:"#5A5D6A", fontSize:11,
+                  }}>+ 追加</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   // ── BoardTab ─────────────────────────────────────
   function BoardTab() {
     const today2  = new Date();
@@ -795,7 +951,7 @@ export default function App() {
             </div>
           </div>
           <div style={{display:"flex", gap:5, alignItems:"center"}}>
-            {[["list","📋 TOP"],["calendar","📅 カレンダー"],["board","📊 ボード"]].map(([t,l])=>(
+            {[["list","📋 TOP"],["calendar","📅 カレンダー"],["board","📊 ボード"],["pipeline","🔀 案件"]].map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)} style={{
                 padding:"7px 16px", borderRadius:9, border:"none", cursor:"pointer", fontSize:13, fontWeight:700,
                 background:tab===t?"linear-gradient(135deg,#FFD700,#FF8C00)":"#1E2230",
@@ -883,7 +1039,29 @@ export default function App() {
               </div>
             </div>
 
-            {/* ② 進捗サマリー */}
+            {/* ② 営業日カウンター（独立） */}
+            {(()=>{
+              const t3 = new Date();
+              const passed2   = getBizDaysPassed(t3.getFullYear(), t3.getMonth()+1);
+              const totalBiz2 = getBizDaysInMonth(t3.getFullYear(), t3.getMonth()+1);
+              const remain2   = totalBiz2 - passed2;
+              return (
+                <div style={{display:"flex", gap:8, marginBottom:10}}>
+                  {[
+                    {label:"営業日目", value:passed2,   color:"#FFD700"},
+                    {label:"残り営業日", value:remain2,  color:"#FF9500"},
+                    {label:"月間営業日", value:totalBiz2, color:"#94A3B8"},
+                  ].map(s=>(
+                    <div key={s.label} style={{flex:1, background:"#1A1D26", borderRadius:10, border:"1px solid #2A2D3A", padding:"10px 12px", textAlign:"center"}}>
+                      <div style={{fontSize:22, fontWeight:800, color:s.color, lineHeight:1}}>{s.value}</div>
+                      <div style={{fontSize:10, color:"#7A7D8A", marginTop:3}}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* ③ 進捗サマリー */}
             {boardData && (()=>{
               const today3   = new Date();
               const mLabel   = (today3.getMonth()+1)+"月";
@@ -892,28 +1070,10 @@ export default function App() {
               function fmt2(n){const v=Number(n)||0;return v>=10000?(v/10000).toFixed(1)+"万":v.toLocaleString();}
               function pct2(a,b){return b>0?Math.round((a/b)*100):0;}
               const passed      = getBizDaysPassed(today3.getFullYear(), today3.getMonth()+1);
-              const totalBiz    = getBizDaysInMonth(today3.getFullYear(), today3.getMonth()+1);
-              const remainBiz   = totalBiz - passed;
               return (
                 <div style={{background:"#1A1D26", borderRadius:14, border:"1px solid #2A2D3A", padding:"12px 14px", marginBottom:14}}>
-                  <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
+                  <div style={{display:"flex", alignItems:"center", marginBottom:10}}>
                     <div style={{fontSize:11, color:"#7A7D8A", fontWeight:700}}>📊 今月進捗 ({mLabel})</div>
-                    <div style={{display:"flex", gap:6, alignItems:"center"}}>
-                      <div style={{background:"#12151E", borderRadius:8, padding:"4px 10px", textAlign:"center"}}>
-                        <div style={{fontSize:16, fontWeight:800, color:"#FFD700", lineHeight:1}}>{passed}</div>
-                        <div style={{fontSize:9, color:"#7A7D8A"}}>営業日目</div>
-                      </div>
-                      <div style={{fontSize:12, color:"#5A5D6A"}}>／</div>
-                      <div style={{background:"#12151E", borderRadius:8, padding:"4px 10px", textAlign:"center"}}>
-                        <div style={{fontSize:16, fontWeight:800, color:"#FF9500", lineHeight:1}}>{remainBiz}</div>
-                        <div style={{fontSize:9, color:"#7A7D8A"}}>残り営業日</div>
-                      </div>
-                      <div style={{fontSize:12, color:"#5A5D6A"}}>／</div>
-                      <div style={{background:"#12151E", borderRadius:8, padding:"4px 10px", textAlign:"center"}}>
-                        <div style={{fontSize:16, fontWeight:800, color:"#94A3B8", lineHeight:1}}>{totalBiz}</div>
-                        <div style={{fontSize:9, color:"#7A7D8A"}}>営業日(月)</div>
-                      </div>
-                    </div>
                   </div>
                   <div style={{display:"flex", flexDirection:"column", gap:8}}>
                     {prods.map(prod=>{
@@ -997,6 +1157,10 @@ export default function App() {
         )}
 
         {/* ════════ カレンダータブ ════════ */}
+        {tab==="pipeline" && (
+          <PipelineTab/>
+        )}
+
         {tab==="board" && (
           <BoardTab/>
         )}
@@ -1138,6 +1302,79 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* 案件モーダル */}
+      {showDealModal&&(
+        <div style={{position:"fixed",inset:0,background:"#000000BB",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:16}}
+          onClick={e=>e.target===e.currentTarget&&setShowDealModal(false)}>
+          <div style={{background:"#1A1D26",borderRadius:20,padding:22,width:"100%",maxWidth:440,border:"1px solid #2A2D3A",maxHeight:"92vh",overflowY:"auto"}}>
+            <div style={{fontWeight:800,fontSize:17,marginBottom:18}}>{editDeal?"案件編集":"案件追加"}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:13}}>
+              {/* 会社名 */}
+              <div>
+                <label style={{fontSize:11,color:"#7A7D8A",display:"block",marginBottom:5}}>会社名</label>
+                <input value={dealForm.company} onChange={e=>setDealForm({...dealForm,company:e.target.value})}
+                  placeholder="例：山田商事" style={{width:"100%",background:"#12151E",border:"1px solid #2A2D3A",borderRadius:10,padding:"10px 14px",color:"#E8EAF0",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              {/* ステージ */}
+              <div>
+                <label style={{fontSize:11,color:"#7A7D8A",display:"block",marginBottom:5}}>ステージ</label>
+                <div style={{display:"flex",gap:6}}>
+                  {STAGES.map(s=>(
+                    <button key={s.key} onClick={()=>setDealForm({...dealForm,stage:s.key})} style={{
+                      flex:1,padding:"7px 4px",borderRadius:8,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
+                      background:dealForm.stage===s.key?s.color+"30":"#12151E",
+                      color:dealForm.stage===s.key?s.color:"#5A5D6A",
+                      outline:dealForm.stage===s.key?`1px solid ${s.color}`:"none",
+                    }}>{s.label}</button>
+                  ))}
+                </div>
+              </div>
+              {/* 商品 */}
+              <div>
+                <label style={{fontSize:11,color:"#7A7D8A",display:"block",marginBottom:5}}>商品（複数選択可）</label>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {[{key:"membership",label:"加盟料",color:"#A78BFA"},{key:"cosmos",label:"COSMOS",color:"#34D399"},{key:"news",label:"ニュース",color:"#60A5FA"}].map(p=>{
+                    const active=(dealForm.products||[]).includes(p.key);
+                    return (
+                      <button key={p.key} onClick={()=>{
+                        const next=active?(dealForm.products||[]).filter(k=>k!==p.key):[...(dealForm.products||[]),p.key];
+                        setDealForm({...dealForm,products:next});
+                      }} style={{
+                        padding:"6px 12px",borderRadius:16,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
+                        background:active?p.color+"18":"#12151E",color:active?p.color:"#5A5D6A",
+                        outline:active?`1px solid ${p.color}`:"none",
+                      }}>{p.label}</button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* 金額 */}
+              <div>
+                <label style={{fontSize:11,color:"#7A7D8A",display:"block",marginBottom:5}}>金額（円）</label>
+                <input type="number" value={dealForm.amount} onChange={e=>setDealForm({...dealForm,amount:e.target.value})}
+                  placeholder="例：500000" style={{width:"100%",background:"#12151E",border:"1px solid #2A2D3A",borderRadius:10,padding:"10px 14px",color:"#E8EAF0",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              {/* 担当者 */}
+              <div>
+                <label style={{fontSize:11,color:"#7A7D8A",display:"block",marginBottom:5}}>担当者名</label>
+                <input value={dealForm.person} onChange={e=>setDealForm({...dealForm,person:e.target.value})}
+                  placeholder="例：田中部長" style={{width:"100%",background:"#12151E",border:"1px solid #2A2D3A",borderRadius:10,padding:"10px 14px",color:"#E8EAF0",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              {/* 備考 */}
+              <div>
+                <label style={{fontSize:11,color:"#7A7D8A",display:"block",marginBottom:5}}>備考</label>
+                <textarea value={dealForm.note} onChange={e=>setDealForm({...dealForm,note:e.target.value})}
+                  rows={2} placeholder="メモ..." style={{width:"100%",background:"#12151E",border:"1px solid #2A2D3A",borderRadius:10,padding:"10px 14px",color:"#E8EAF0",fontSize:14,outline:"none",resize:"none",boxSizing:"border-box",fontFamily:"inherit"}}/>
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:2}}>
+                <button onClick={()=>setShowDealModal(false)} style={{flex:1,padding:"11px",borderRadius:12,border:"1px solid #2A2D3A",background:"transparent",color:"#7A7D8A",cursor:"pointer",fontSize:13,fontWeight:600}}>キャンセル</button>
+                <button onClick={saveDeal} style={{flex:2,padding:"11px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#FFD700,#FF8C00)",color:"#0D0F14",cursor:"pointer",fontSize:13,fontWeight:800}}>保存する</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FAB */}
       <button onClick={()=>openAdd()} style={{
