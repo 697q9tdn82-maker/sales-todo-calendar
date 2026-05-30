@@ -143,6 +143,42 @@ function exportToExcel(todos) {
 }
 
 function makeDateStr(y,m,d) { return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
+// ── 日本祝日データ ────────────────────────────────────
+const JP_HOLIDAYS = new Set([
+  // 2025年
+  "2025-01-01","2025-01-13","2025-02-11","2025-02-23","2025-02-24",
+  "2025-03-20","2025-04-29","2025-05-03","2025-05-04","2025-05-05",
+  "2025-05-06","2025-07-21","2025-08-11","2025-09-15","2025-09-22",
+  "2025-09-23","2025-10-13","2025-11-03","2025-11-23","2025-11-24",
+  "2025-12-23",
+  // 2026年
+  "2026-01-01","2026-01-12","2026-02-11","2026-02-23","2026-03-20",
+  "2026-04-29","2026-05-03","2026-05-04","2026-05-05","2026-05-06",
+  "2026-07-20","2026-08-11","2026-09-21","2026-09-22","2026-09-23",
+  "2026-10-12","2026-11-03","2026-11-23",
+]);
+function isHoliday(y,m,d) {
+  const s = `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  return JP_HOLIDAYS.has(s);
+}
+function isBizDay(y,m,d) {
+  const dow = new Date(y,m-1,d).getDay();
+  return dow!==0 && dow!==6 && !isHoliday(y,m,d);
+}
+function getBizDaysInMonth(y,m) {
+  const total = new Date(y,m,0).getDate();
+  let c=0;
+  for(let d=1;d<=total;d++) if(isBizDay(y,m,d)) c++;
+  return c;
+}
+function getBizDaysPassed(y,m) {
+  const today0 = new Date();
+  const last = (today0.getFullYear()===y&&today0.getMonth()+1===m) ? today0.getDate() : new Date(y,m,0).getDate();
+  let c=0;
+  for(let d=1;d<=last;d++) if(isBizDay(y,m,d)) c++;
+  return c;
+}
+
 function toJSTDateStr(d) {
   const jst = new Date(d.getTime() + 9*60*60*1000);
   return jst.toISOString().slice(0,10);
@@ -535,28 +571,8 @@ export default function App() {
     }
 
     // 今月の営業日数（簡易：月の平日数）
-    function bizDaysInMonth(year, month) {
-      let count=0;
-      const days = new Date(year, month, 0).getDate();
-      for(let d=1;d<=days;d++) {
-        const dow = new Date(year,month-1,d).getDay();
-        if(dow!==0&&dow!==6) count++;
-      }
-      return count;
-    }
-    function bizDaysPassed(year, month) {
-      const today3 = new Date();
-      let count=0;
-      const last = today3.getMonth()+1===month ? today3.getDate() : new Date(year,month,0).getDate();
-      for(let d=1;d<=last;d++) {
-        const dow = new Date(year,month-1,d).getDay();
-        if(dow!==0&&dow!==6) count++;
-      }
-      return count;
-    }
-
-    const totalBizDays  = bizDaysInMonth(today2.getFullYear(), today2.getMonth()+1);
-    const passedBizDays = bizDaysPassed(today2.getFullYear(), today2.getMonth()+1);
+    const totalBizDays  = getBizDaysInMonth(today2.getFullYear(), today2.getMonth()+1);
+    const passedBizDays = getBizDaysPassed(today2.getFullYear(), today2.getMonth()+1);
 
     const inputStyle2 = {
       background:"#12151E", border:"1px solid #2A2D3A", borderRadius:8,
@@ -779,7 +795,7 @@ export default function App() {
             </div>
           </div>
           <div style={{display:"flex", gap:5, alignItems:"center"}}>
-            {[["list","📋 一覧"],["calendar","📅 カレンダー"],["board","📊 ボード"]].map(([t,l])=>(
+            {[["list","📋 TOP"],["calendar","📅 カレンダー"],["board","📊 ボード"]].map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)} style={{
                 padding:"7px 16px", borderRadius:9, border:"none", cursor:"pointer", fontSize:13, fontWeight:700,
                 background:tab===t?"linear-gradient(135deg,#FFD700,#FF8C00)":"#1E2230",
@@ -875,17 +891,30 @@ export default function App() {
               const prods    = boardData.products||[];
               function fmt2(n){const v=Number(n)||0;return v>=10000?(v/10000).toFixed(1)+"万":v.toLocaleString();}
               function pct2(a,b){return b>0?Math.round((a/b)*100):0;}
-              // 次のマイルストーン
-              function bizDaysPassed2(year,month){
-                const t2=new Date();let c=0;
-                const last=t2.getMonth()+1===month?t2.getDate():new Date(year,month,0).getDate();
-                for(let d=1;d<=last;d++){const dw=new Date(year,month-1,d).getDay();if(dw!==0&&dw!==6)c++;}
-                return c;
-              }
-              const passed = bizDaysPassed2(today3.getFullYear(), today3.getMonth()+1);
+              const passed      = getBizDaysPassed(today3.getFullYear(), today3.getMonth()+1);
+              const totalBiz    = getBizDaysInMonth(today3.getFullYear(), today3.getMonth()+1);
+              const remainBiz   = totalBiz - passed;
               return (
                 <div style={{background:"#1A1D26", borderRadius:14, border:"1px solid #2A2D3A", padding:"12px 14px", marginBottom:14}}>
-                  <div style={{fontSize:11, color:"#7A7D8A", fontWeight:700, marginBottom:10}}>📊 今月進捗 ({mLabel})</div>
+                  <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
+                    <div style={{fontSize:11, color:"#7A7D8A", fontWeight:700}}>📊 今月進捗 ({mLabel})</div>
+                    <div style={{display:"flex", gap:6, alignItems:"center"}}>
+                      <div style={{background:"#12151E", borderRadius:8, padding:"4px 10px", textAlign:"center"}}>
+                        <div style={{fontSize:16, fontWeight:800, color:"#FFD700", lineHeight:1}}>{passed}</div>
+                        <div style={{fontSize:9, color:"#7A7D8A"}}>営業日目</div>
+                      </div>
+                      <div style={{fontSize:12, color:"#5A5D6A"}}>／</div>
+                      <div style={{background:"#12151E", borderRadius:8, padding:"4px 10px", textAlign:"center"}}>
+                        <div style={{fontSize:16, fontWeight:800, color:"#FF9500", lineHeight:1}}>{remainBiz}</div>
+                        <div style={{fontSize:9, color:"#7A7D8A"}}>残り営業日</div>
+                      </div>
+                      <div style={{fontSize:12, color:"#5A5D6A"}}>／</div>
+                      <div style={{background:"#12151E", borderRadius:8, padding:"4px 10px", textAlign:"center"}}>
+                        <div style={{fontSize:16, fontWeight:800, color:"#94A3B8", lineHeight:1}}>{totalBiz}</div>
+                        <div style={{fontSize:9, color:"#7A7D8A"}}>営業日(月)</div>
+                      </div>
+                    </div>
+                  </div>
                   <div style={{display:"flex", flexDirection:"column", gap:8}}>
                     {prods.map(prod=>{
                       const color2={membership:"#A78BFA",cosmos:"#34D399",news:"#60A5FA"}[prod.key]||"#94A3B8";
@@ -896,11 +925,11 @@ export default function App() {
                       const cumTgt = months2.reduce((s,m)=>s+(Number(prod.monthlyTargets?.[m])||0),0);
                       const cumRes = months2.reduce((s,m)=>s+(Number(prod.monthlyResults?.[m])||0),0);
                       const cumP   = pct2(cumRes,cumTgt);
-                      // 次のMS
+                      // 次のMS（金額未達のもので一番%が小さいもの）
                       const ms2 = MILESTONES[prod.key]||[];
-                      const nextMs = ms2.find(m=>passed<=m.day&&Math.round(tgt*m.pct/100)>res);
+                      const nextMs = ms2.find(m=>Math.round(tgt*m.pct/100)>res);
                       const msText = nextMs
-                        ? `次MS(${nextMs.day}営業日): あと${fmt2(Math.round(tgt*nextMs.pct/100)-res)}円`
+                        ? `次MS(${nextMs.day}営業日/${nextMs.pct}%): あと${fmt2(Math.round(tgt*nextMs.pct/100)-res)}円`
                         : ms2.length>0?"✅ 全MS達成":"";
                       return (
                         <div key={prod.key} style={{display:"flex", alignItems:"center", gap:10}}>
