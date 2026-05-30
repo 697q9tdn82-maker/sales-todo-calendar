@@ -339,7 +339,6 @@ export default function App() {
     low:        todos.filter(t=>t.priority==="low"&&t.status!=="done"&&!t.done).length,
     monthTotal: monthTodos.length,
   };
-  const completionRate = stats.total>0 ? Math.round((stats.done/stats.total)*100) : 0;
 
   // ── 一覧フィルタ ──────────────────────────────────
   let listTodos = [...todos];
