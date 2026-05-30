@@ -1069,7 +1069,6 @@ export default function App() {
               const prods    = boardData.products||[];
               function fmt2(n){const v=Number(n)||0;return v>=10000?(v/10000).toFixed(1)+"万":v.toLocaleString();}
               function pct2(a,b){return b>0?Math.round((a/b)*100):0;}
-              const passed      = getBizDaysPassed(today3.getFullYear(), today3.getMonth()+1);
               return (
                 <div style={{background:"#1A1D26", borderRadius:14, border:"1px solid #2A2D3A", padding:"12px 14px", marginBottom:14}}>
                   <div style={{display:"flex", alignItems:"center", marginBottom:10}}>
