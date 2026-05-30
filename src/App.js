@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import * as XLSX from "xlsx";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc } from "firebase/firestore";
 
 // ── Firebase設定 ──────────────────────────────────────
 const firebaseConfig = {
@@ -180,7 +180,6 @@ export default function App() {
   const [boardData, setBoardData]   = useState(null);
   const [boardLoading, setBoardLoading] = useState(true);
   const [boardEdit, setBoardEdit]   = useState(false); // 編集モード
-  const [halfLabel, setHalfLabel]   = useState("上期（4〜9月）");
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "sales_board", "main"), (snap) => {
@@ -203,7 +202,7 @@ export default function App() {
       setBoardLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveBoardData(data) {
     await setDoc(doc(db, "sales_board", "main"), data);
