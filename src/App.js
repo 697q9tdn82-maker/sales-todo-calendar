@@ -620,7 +620,7 @@ export default function App() {
         </div>
 
         {/* サマリー */}
-        <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:9, marginBottom:16}}>
+        <div style={{display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:9, marginBottom:16}}>
           {STAGES.map(s=>{
             const stagDeals = deals.filter(d=>d.stage===s.key);
             return (
@@ -634,7 +634,7 @@ export default function App() {
         </div>
 
         {/* かんばんボード */}
-        <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10}}>
+        <div style={{display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:10}}>
           {STAGES.map(stage=>{
             const stageDeals = deals.filter(d=>d.stage===stage.key);
             return (
@@ -950,19 +950,19 @@ export default function App() {
               <div style={{fontSize:10, color:"#7A7D8A", letterSpacing:"0.1em"}}>TOP PERFORMER BOARD</div>
             </div>
           </div>
-          <div style={{display:"flex", gap:5, alignItems:"center"}}>
-            {[["list","📋 TOP"],["calendar","📅 カレンダー"],["board","📊 ボード"],["pipeline","🔀 案件"]].map(([t,l])=>(
+          <div style={{display:"flex", gap:5, flexWrap:"wrap", justifyContent:"flex-end"}}>
+            {[["list","TOP"],["calendar","カレンダー"],["board","ボード"],["pipeline","案件"]].map(([t,l])=>(
               <button key={t} onClick={()=>setTab(t)} style={{
-                padding:"7px 16px", borderRadius:9, border:"none", cursor:"pointer", fontSize:13, fontWeight:700,
+                padding:"6px 12px", borderRadius:9, border:"none", cursor:"pointer", fontSize:12, fontWeight:700,
                 background:tab===t?"linear-gradient(135deg,#FFD700,#FF8C00)":"#1E2230",
-                color:tab===t?"#0D0F14":"#7A7D8A", transition:"all 0.2s",
+                color:tab===t?"#0D0F14":"#7A7D8A", transition:"all 0.2s", whiteSpace:"nowrap",
               }}>{l}</button>
             ))}
           </div>
         </div>
       </div>
 
-      <div style={{maxWidth:980, margin:"0 auto", padding:"16px 13px 100px"}}>
+      <div style={{maxWidth:980, margin:"0 auto", padding:"12px 10px 100px"}}>
 
         {/* ── 統計バー ── */}
         <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:9, marginBottom:16}}>
@@ -986,7 +986,7 @@ export default function App() {
         {tab==="list" && (
           <div>
             {/* ④⑤ 報告書欄 + ポモドーロ（2カラム） */}
-            <div style={{display:"grid", gridTemplateColumns:"1fr auto", gap:12, marginBottom:14, alignItems:"start"}}>
+            <div style={{display:"flex", flexDirection:"column", gap:10, marginBottom:14}}>
 
               {/* 報告書欄 */}
               <div style={{background:"#1A1D26", borderRadius:14, border:"1px solid #2A2D3A", padding:"12px 14px"}}>
@@ -1020,22 +1020,24 @@ export default function App() {
               </div>
 
               {/* ⑤ ポモドーロタイマー */}
-              <div style={{background:"#1A1D26", borderRadius:14, border:`1px solid ${pomoMode==="work"?"#FF444430":"#34C75930"}`, padding:"12px 14px", minWidth:140, textAlign:"center"}}>
-                <div style={{fontSize:10, color:pomoMode==="work"?"#FF5252":"#34C759", fontWeight:700, marginBottom:6, letterSpacing:"0.1em"}}>
-                  {pomoMode==="work"?"🍅 集中中":"☕ 休憩中"}
+              <div style={{background:"#1A1D26", borderRadius:14, border:`1px solid ${pomoMode==="work"?"#FF444430":"#34C75930"}`, padding:"12px 16px"}}>
+                <div style={{display:"flex", alignItems:"center", gap:12}}>
+                  <div style={{fontSize:11, color:pomoMode==="work"?"#FF5252":"#34C759", fontWeight:700, whiteSpace:"nowrap"}}>
+                    {pomoMode==="work"?"🍅 集中中":"☕ 休憩中"}
+                  </div>
+                  <div style={{fontSize:28, fontWeight:800, color:pomoMode==="work"?"#FF5252":"#34C759", lineHeight:1, fontVariantNumeric:"tabular-nums", flex:1}}>
+                    {pomoFmt(pomoTime)}
+                  </div>
+                  <div style={{display:"flex", gap:6, alignItems:"center"}}>
+                    <button onClick={()=>setPomoRunning(!pomoRunning)} style={{
+                      background:pomoRunning?"#FF444418":"#34C75918", border:`1px solid ${pomoRunning?"#FF4444":"#34C759"}`,
+                      borderRadius:8, padding:"6px 14px", cursor:"pointer", fontSize:13, fontWeight:700,
+                      color:pomoRunning?"#FF5252":"#34C759",
+                    }}>{pomoRunning?"⏸":"▶"}</button>
+                    <button onClick={pomoReset} style={{background:"#1E2230", border:"1px solid #2A2D3A", borderRadius:8, padding:"6px 10px", cursor:"pointer", fontSize:13, color:"#7A7D8A"}}>↺</button>
+                    <div style={{fontSize:10, color:"#7A7D8A", whiteSpace:"nowrap"}}>{pomoCount}セット</div>
+                  </div>
                 </div>
-                <div style={{fontSize:32, fontWeight:800, color:pomoMode==="work"?"#FF5252":"#34C759", lineHeight:1, marginBottom:8, fontVariantNumeric:"tabular-nums"}}>
-                  {pomoFmt(pomoTime)}
-                </div>
-                <div style={{display:"flex", gap:5, justifyContent:"center", marginBottom:6}}>
-                  <button onClick={()=>setPomoRunning(!pomoRunning)} style={{
-                    background:pomoRunning?"#FF444418":"#34C75918", border:`1px solid ${pomoRunning?"#FF4444":"#34C759"}`,
-                    borderRadius:8, padding:"5px 12px", cursor:"pointer", fontSize:12, fontWeight:700,
-                    color:pomoRunning?"#FF5252":"#34C759",
-                  }}>{pomoRunning?"⏸":"▶"}</button>
-                  <button onClick={pomoReset} style={{background:"#1E2230", border:"1px solid #2A2D3A", borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:12, color:"#7A7D8A"}}>↺</button>
-                </div>
-                <div style={{fontSize:10, color:"#7A7D8A"}}>完了 {pomoCount} セット</div>
               </div>
             </div>
 
