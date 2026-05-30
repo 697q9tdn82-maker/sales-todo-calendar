@@ -157,6 +157,44 @@ const todayStr = toJSTDateStr(today);
 // ── メインコンポーネント ──────────────────────────────
 export default function App() {
   const [tab, setTab]           = useState("list");
+  // ④ 報告書欄
+  const [reportItems, setReportItems] = useState(() => {
+    try { const s=localStorage.getItem("sales-report"); return s?JSON.parse(s):[]; } catch { return []; }
+  });
+  const [reportInput, setReportInput] = useState("");
+  const [reportDate,  setReportDate]  = useState(todayStr);
+  useEffect(()=>{ try{localStorage.setItem("sales-report",JSON.stringify(reportItems));}catch{} },[reportItems]);
+
+  // ⑤ ポモドーロ
+  const POMO_WORK = 25*60, POMO_BREAK = 5*60;
+  const [pomoTime,    setPomoTime]    = useState(POMO_WORK);
+  const [pomoRunning, setPomoRunning] = useState(false);
+  const [pomoMode,    setPomoMode]    = useState("work"); // "work"|"break"
+  const [pomoCount,   setPomoCount]   = useState(0);
+  useEffect(()=>{
+    if(!pomoRunning) return;
+    const t = setInterval(()=>{
+      setPomoTime(prev=>{
+        if(prev<=1){
+          clearInterval(t);
+          setPomoRunning(false);
+          if(pomoMode==="work"){
+            setPomoCount(c=>c+1);
+            setPomoMode("break");
+            setPomoTime(POMO_BREAK);
+          } else {
+            setPomoMode("work");
+            setPomoTime(POMO_WORK);
+          }
+          return prev;
+        }
+        return prev-1;
+      });
+    },1000);
+    return ()=>clearInterval(t);
+  },[pomoRunning,pomoMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  function pomoReset(){ setPomoRunning(false); setPomoMode("work"); setPomoTime(POMO_WORK); }
+  function pomoFmt(s){ return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`; }
   const [calView, setCalView]   = useState("month");
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1)); // JSTベース
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -267,6 +305,12 @@ export default function App() {
     if (!window.confirm("削除しますか？")) return;
     await deleteDoc(doc(db, "sales_todos", id));
   }
+  async function deleteDoneTodos() {
+    const doneTodos = todos.filter(t=>t.status==="done"||t.done);
+    if (doneTodos.length===0) { alert("済のタスクはありません"); return; }
+    if (!window.confirm(`済のタスク ${doneTodos.length}件を一括削除しますか？`)) return;
+    await Promise.all(doneTodos.map(t=>deleteDoc(doc(db,"sales_todos",t.id))));
+  }
 
   // ── カレンダー計算 ────────────────────────────────
   const year  = currentDate.getFullYear();
@@ -291,6 +335,8 @@ export default function App() {
     total:      todos.length,
     done:       todos.filter(t=>t.status==="done"||t.done).length,
     high:       todos.filter(t=>t.priority==="high"&&t.status!=="done"&&!t.done).length,
+    medium:     todos.filter(t=>t.priority==="medium"&&t.status!=="done"&&!t.done).length,
+    low:        todos.filter(t=>t.priority==="low"&&t.status!=="done"&&!t.done).length,
     monthTotal: monthTodos.length,
   };
   const completionRate = stats.total>0 ? Math.round((stats.done/stats.total)*100) : 0;
@@ -748,20 +794,18 @@ export default function App() {
       <div style={{maxWidth:980, margin:"0 auto", padding:"16px 13px 100px"}}>
 
         {/* ── 統計バー ── */}
-        <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:9, marginBottom:16}}>
+        <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:9, marginBottom:16}}>
           {[
-            {label:"全タスク",   value:stats.total,          icon:"📌", accent:"#94A3B8"},
-            {label:"完了率",     value:`${completionRate}%`, icon:"✅", accent:"#66BB6A"},
-            {label:"緊急",       value:stats.high,           icon:"🔥", accent:"#FF5252"},
-            {label:"今月",       value:stats.monthTotal,     icon:"📅", accent:"#4FC3F7"},
+            {label:"🔴 緊急", value:stats.high,   accent:"#FF5252"},
+            {label:"🟠 重要", value:stats.medium, accent:"#FF9500"},
+            {label:"🟢 通常", value:stats.low,    accent:"#34C759"},
           ].map(s=>(
             <div key={s.label} style={{
               background:"#1A1D26", borderRadius:12, padding:"11px 13px",
               border:"1px solid #2A2D3A", position:"relative", overflow:"hidden",
             }}>
-              <div style={{fontSize:16, marginBottom:2}}>{s.icon}</div>
-              <div style={{fontSize:20, fontWeight:800, color:s.accent, lineHeight:1}}>{s.value}</div>
-              <div style={{fontSize:10, color:"#7A7D8A", marginTop:3}}>{s.label}</div>
+              <div style={{fontSize:10, color:"#7A7D8A", marginBottom:4}}>{s.label}</div>
+              <div style={{fontSize:22, fontWeight:800, color:s.accent, lineHeight:1}}>{s.value}<span style={{fontSize:12, marginLeft:3}}>件</span></div>
               <div style={{position:"absolute", right:-8, bottom:-8, width:46, height:46, borderRadius:"50%", background:s.accent, opacity:0.07}}/>
             </div>
           ))}
@@ -770,6 +814,113 @@ export default function App() {
         {/* ════════ 一覧タブ ════════ */}
         {tab==="list" && (
           <div>
+            {/* ④⑤ 報告書欄 + ポモドーロ（2カラム） */}
+            <div style={{display:"grid", gridTemplateColumns:"1fr auto", gap:12, marginBottom:14, alignItems:"start"}}>
+
+              {/* 報告書欄 */}
+              <div style={{background:"#1A1D26", borderRadius:14, border:"1px solid #2A2D3A", padding:"12px 14px"}}>
+                <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8}}>
+                  <div style={{fontSize:11, color:"#7A7D8A", fontWeight:700}}>📝 本日提出報告書</div>
+                  <input type="date" value={reportDate} onChange={e=>setReportDate(e.target.value)}
+                    style={{background:"#12151E", border:"1px solid #2A2D3A", borderRadius:6, padding:"3px 8px", color:"#7A7D8A", fontSize:11, outline:"none"}}/>
+                </div>
+                {/* 入力 */}
+                <div style={{display:"flex", gap:6, marginBottom:8}}>
+                  <input value={reportInput} onChange={e=>setReportInput(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Enter"&&reportInput.trim()){setReportItems([...reportItems,{id:Date.now(),date:reportDate,name:reportInput.trim()}]);setReportInput("");}}}
+                    placeholder="会社名を入力してEnter"
+                    style={{flex:1, background:"#12151E", border:"1px solid #2A2D3A", borderRadius:8, padding:"7px 10px", color:"#E8EAF0", fontSize:12, outline:"none"}}/>
+                  <button onClick={()=>{if(reportInput.trim()){setReportItems([...reportItems,{id:Date.now(),date:reportDate,name:reportInput.trim()}]);setReportInput("");}}} style={{
+                    background:"linear-gradient(135deg,#FFD700,#FF8C00)", border:"none", borderRadius:8, padding:"7px 12px", cursor:"pointer", fontSize:12, fontWeight:700, color:"#0D0F14",
+                  }}>追加</button>
+                </div>
+                {/* リスト */}
+                {reportItems.filter(r=>r.date===reportDate).length===0
+                  ? <div style={{fontSize:11, color:"#3A3D4A", textAlign:"center", padding:"8px 0"}}>本日の報告書なし</div>
+                  : <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
+                      {reportItems.filter(r=>r.date===reportDate).map(r=>(
+                        <div key={r.id} style={{display:"flex", alignItems:"center", gap:4, background:"#12151E", border:"1px solid #2A2D3A", borderRadius:20, padding:"4px 10px"}}>
+                          <span style={{fontSize:12, color:"#E8EAF0"}}>📄 {r.name}</span>
+                          <button onClick={()=>setReportItems(reportItems.filter(x=>x.id!==r.id))} style={{background:"none", border:"none", cursor:"pointer", color:"#FF5252", fontSize:11, padding:0}}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                }
+              </div>
+
+              {/* ⑤ ポモドーロタイマー */}
+              <div style={{background:"#1A1D26", borderRadius:14, border:`1px solid ${pomoMode==="work"?"#FF444430":"#34C75930"}`, padding:"12px 14px", minWidth:140, textAlign:"center"}}>
+                <div style={{fontSize:10, color:pomoMode==="work"?"#FF5252":"#34C759", fontWeight:700, marginBottom:6, letterSpacing:"0.1em"}}>
+                  {pomoMode==="work"?"🍅 集中中":"☕ 休憩中"}
+                </div>
+                <div style={{fontSize:32, fontWeight:800, color:pomoMode==="work"?"#FF5252":"#34C759", lineHeight:1, marginBottom:8, fontVariantNumeric:"tabular-nums"}}>
+                  {pomoFmt(pomoTime)}
+                </div>
+                <div style={{display:"flex", gap:5, justifyContent:"center", marginBottom:6}}>
+                  <button onClick={()=>setPomoRunning(!pomoRunning)} style={{
+                    background:pomoRunning?"#FF444418":"#34C75918", border:`1px solid ${pomoRunning?"#FF4444":"#34C759"}`,
+                    borderRadius:8, padding:"5px 12px", cursor:"pointer", fontSize:12, fontWeight:700,
+                    color:pomoRunning?"#FF5252":"#34C759",
+                  }}>{pomoRunning?"⏸":"▶"}</button>
+                  <button onClick={pomoReset} style={{background:"#1E2230", border:"1px solid #2A2D3A", borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:12, color:"#7A7D8A"}}>↺</button>
+                </div>
+                <div style={{fontSize:10, color:"#7A7D8A"}}>完了 {pomoCount} セット</div>
+              </div>
+            </div>
+
+            {/* ② 進捗サマリー */}
+            {boardData && (()=>{
+              const today3   = new Date();
+              const mLabel   = (today3.getMonth()+1)+"月";
+              const months2  = boardData.months||HALF_MONTHS;
+              const prods    = boardData.products||[];
+              function fmt2(n){const v=Number(n)||0;return v>=10000?(v/10000).toFixed(1)+"万":v.toLocaleString();}
+              function pct2(a,b){return b>0?Math.round((a/b)*100):0;}
+              // 次のマイルストーン
+              function bizDaysPassed2(year,month){
+                const t2=new Date();let c=0;
+                const last=t2.getMonth()+1===month?t2.getDate():new Date(year,month,0).getDate();
+                for(let d=1;d<=last;d++){const dw=new Date(year,month-1,d).getDay();if(dw!==0&&dw!==6)c++;}
+                return c;
+              }
+              const passed = bizDaysPassed2(today3.getFullYear(), today3.getMonth()+1);
+              return (
+                <div style={{background:"#1A1D26", borderRadius:14, border:"1px solid #2A2D3A", padding:"12px 14px", marginBottom:14}}>
+                  <div style={{fontSize:11, color:"#7A7D8A", fontWeight:700, marginBottom:10}}>📊 今月進捗 ({mLabel})</div>
+                  <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                    {prods.map(prod=>{
+                      const color2={membership:"#A78BFA",cosmos:"#34D399",news:"#60A5FA"}[prod.key]||"#94A3B8";
+                      const tgt  = Number(prod.monthlyTargets?.[mLabel])||0;
+                      const res  = Number(prod.monthlyResults?.[mLabel])||0;
+                      const p3   = pct2(res,tgt);
+                      // 累計
+                      const cumTgt = months2.reduce((s,m)=>s+(Number(prod.monthlyTargets?.[m])||0),0);
+                      const cumRes = months2.reduce((s,m)=>s+(Number(prod.monthlyResults?.[m])||0),0);
+                      const cumP   = pct2(cumRes,cumTgt);
+                      // 次のMS
+                      const ms2 = MILESTONES[prod.key]||[];
+                      const nextMs = ms2.find(m=>passed<=m.day&&Math.round(tgt*m.pct/100)>res);
+                      const msText = nextMs
+                        ? `次MS(${nextMs.day}営業日): あと${fmt2(Math.round(tgt*nextMs.pct/100)-res)}円`
+                        : ms2.length>0?"✅ 全MS達成":"";
+                      return (
+                        <div key={prod.key} style={{display:"flex", alignItems:"center", gap:10}}>
+                          <div style={{width:52, fontSize:11, fontWeight:700, color:color2, flexShrink:0}}>{prod.label}</div>
+                          <div style={{flex:1}}>
+                            <div style={{height:6, background:"#12151E", borderRadius:3, overflow:"hidden"}}>
+                              <div style={{height:"100%", width:`${Math.min(p3,100)}%`, background:color2, borderRadius:3}}/>
+                            </div>
+                          </div>
+                          <div style={{fontSize:11, color:p3>=100?"#FFD700":p3>=70?"#66BB6A":"#E8EAF0", fontWeight:700, minWidth:36, textAlign:"right"}}>{p3}%</div>
+                          <div style={{fontSize:10, color:"#7A7D8A", minWidth:60, textAlign:"right"}}>累計{cumP}%</div>
+                          {msText&&<div style={{fontSize:10, color:"#FBBF24", minWidth:120, textAlign:"right"}}>{msText}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             <div style={{display:"flex", gap:8, marginBottom:12, alignItems:"center", flexWrap:"wrap"}}>
               <div style={{display:"flex", gap:5}}>
                 {[["all","すべて"],["undone","未"],["progress","着手中"],["done","済"]].map(([v,l])=>(
@@ -794,10 +945,16 @@ export default function App() {
             <CatFilterBar catTab={listCatTab} setCatTab={setListCatTab} catFilter={listCatFilter} setCatFilter={setListCatFilter}/>
             <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
               <div style={{fontSize:12, color:"#5A5D6A"}}>{listTodos.length}件</div>
-              <button onClick={()=>exportToExcel(todos)} style={{
-                padding:"7px 14px", borderRadius:9, border:"1px solid #34D39960", cursor:"pointer", fontSize:12, fontWeight:700,
-                background:"#34D39918", color:"#34D399", display:"flex", alignItems:"center", gap:5,
-              }}>📥 今西さん提出用</button>
+              <div style={{display:"flex", gap:6}}>
+                <button onClick={deleteDoneTodos} style={{
+                  padding:"6px 12px", borderRadius:9, border:"1px solid #FF525260", cursor:"pointer", fontSize:11, fontWeight:700,
+                  background:"#FF525218", color:"#FF5252",
+                }}>🗑 済を一括削除</button>
+                <button onClick={()=>exportToExcel(todos)} style={{
+                  padding:"6px 12px", borderRadius:9, border:"1px solid #34D39960", cursor:"pointer", fontSize:11, fontWeight:700,
+                  background:"#34D39918", color:"#34D399",
+                }}>📥 今西さん提出用</button>
+              </div>
             </div>
             <div style={{display:"flex", flexDirection:"column", gap:9}}>
               {listTodos.length===0&&(
