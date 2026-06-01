@@ -62,7 +62,7 @@ const MONTHS_JP = ["1月","2月","3月","4月","5月","6月","7月","8月","9月
 // ── ユーティリティ ────────────────────────────────────
 
 // ── Excel出力（今西さん提出用） ────────────────────────
-function exportToExcel(todos) {
+function exportToExcel(todos, reportItems) {
   // ── データ生成 ──────────────────────────────────────
   const headers = ["日付", "曜日", "タスク内容", "営業アクション", "商品区分", "連絡手段", "緊急度", "完了"];
   const rows = [...todos]
@@ -137,9 +137,26 @@ function exportToExcel(todos) {
     });
   });
 
+  // ── 報告書シート ────────────────────────────────────
+  const todayReport = (reportItems||[]).filter(r=>r.date===toJSTDateStr(new Date()));
+  const repHeaders  = ["本日提出報告書"];
+  const repRows     = todayReport.length>0
+    ? todayReport.map(r=>[r.name])
+    : [["（本日の報告書なし）"]];
+  const wsRep = XLSX.utils.aoa_to_sheet([repHeaders, ...repRows]);
+  wsRep["!cols"] = [{ wch: 30 }];
+  wsRep["!rows"] = [repHeaders, ...repRows].map(()=>({ hpt: 18 }));
+  // タイトル行スタイル
+  if (wsRep["A1"]) wsRep["A1"].s = {
+    fill:{ patternType:"solid", fgColor:{ rgb:"BDD7EE" } },
+    font:{ bold:true, color:{ rgb:"1F3864" } },
+    alignment:{ horizontal:"center", vertical:"center" },
+  };
+
   // ── ワークブック出力 ────────────────────────────────
   const wb  = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "タスク一覧");
+  XLSX.utils.book_append_sheet(wb, wsRep, "本日報告書");
+  XLSX.utils.book_append_sheet(wb, ws,    "タスク一覧");
   const now = toJSTDateStr(new Date());
   XLSX.writeFile(wb, "タスク一覧_" + now.replace(/-/g,"") + ".xlsx");
 }
@@ -425,12 +442,14 @@ export default function App() {
   for (let i=0;i<firstDay;i++) calendarDays.push(null);
   for (let d=1;d<=daysInMonth;d++) calendarDays.push(d);
   const threeDays = [selectedDate, addDays(selectedDate,1), addDays(selectedDate,2)];
-  // 期限切れタスクは今日に引き上げて表示（ステータス問わず・データは変えない）
-  const displayDate = (t) => {
-    if (t.date < todayStr) return todayStr;
-    return t.date;
-  };
-  const todosFor  = (ds) => todos.filter(t=>displayDate(t)===ds);
+  // 期限切れタスクの日付を自動的に当日に更新
+  useEffect(() => {
+    const overdue = todos.filter(t => t.date < todayStr && t.status !== "done" && !t.done);
+    overdue.forEach(async t => {
+      await updateDoc(doc(db, "sales_todos", t.id), { date: todayStr });
+    });
+  }, [todos]); // eslint-disable-line react-hooks/exhaustive-deps
+  const todosFor  = (ds) => todos.filter(t=>t.date===ds);
 
   // ── 統計 ─────────────────────────────────────────
   const monthPrefix = `${year}-${String(month+1).padStart(2,"0")}`;
@@ -462,7 +481,7 @@ export default function App() {
   // ── カレンダー日次フィルタ ────────────────────────
   const priorityRank={high:0,medium:1,low:2};
   const dayTodos = (calCatFilter==="all" ? todos : todos.filter(t=>t.category===calCatFilter))
-    .filter(t=>displayDate(t)===selectedDate)
+    .filter(t=>t.date===selectedDate)
     .sort((a,b)=>priorityRank[a.priority]-priorityRank[b.priority])
     .sort((a,b)=>{ const d=s=>s.status==="done"||s.done; return d(a)===d(b)?0:d(a)?1:-1; });
 
@@ -1162,7 +1181,7 @@ export default function App() {
                   padding:"6px 12px", borderRadius:9, border:"1px solid #FF525260", cursor:"pointer", fontSize:11, fontWeight:700,
                   background:"#FF525218", color:"#FF5252",
                 }}>🗑 済を一括削除</button>
-                <button onClick={()=>exportToExcel(todos)} style={{
+                <button onClick={()=>exportToExcel(todos, reportItems)} style={{
                   padding:"6px 12px", borderRadius:9, border:"1px solid #34D39960", cursor:"pointer", fontSize:11, fontWeight:700,
                   background:"#34D39918", color:"#34D399",
                 }}>📥 今西さん提出用</button>
