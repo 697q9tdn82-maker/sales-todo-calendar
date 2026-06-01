@@ -29,12 +29,14 @@ const STATUSES = {
 };
 
 const ACTION_CATEGORIES = {
-  prospect: { label: "新規開拓", icon: "🎯" },
+  contact:  { label: "初回接触", icon: "🤝", pipelineStage: "contact"  },
+  proposal: { label: "提案",    icon: "📋", pipelineStage: "proposal" },
+  closing:  { label: "クロージング", icon: "🎯", pipelineStage: "closing" },
   followup: { label: "フォロー", icon: "📞" },
-  proposal: { label: "提案",    icon: "📋" },
-  contract: { label: "契約",    icon: "✍️" },
   admin:    { label: "管理",    icon: "🗂️" },
 };
+// パイプライン連動するアクションキー
+const PIPELINE_ACTIONS = ["contact","proposal","closing"];
 
 const PRODUCT_CATEGORIES = {
   membership: { label: "加盟料",   icon: "🏅", color: "#A78BFA" },
@@ -374,6 +376,24 @@ export default function App() {
         await updateDoc(doc(db, "sales_todos", editTodo.id), { ...form, done: form.status==="done" });
       } else {
         await addDoc(collection(db, "sales_todos"), { ...form, done: form.status==="done" });
+        // パイプライン自動登録（初回接触・提案・クロージングを選んだ場合）
+        const cats = form.categories || [];
+        const pipeAction = cats.find(k => PIPELINE_ACTIONS.includes(k));
+        if (pipeAction) {
+          const stageKey = ACTION_CATEGORIES[pipeAction].pipelineStage;
+          const company  = form.title.replace(/\s*(初回|提案|クロージング|アポ|訪問|面談).*$/,"").trim();
+          const products = cats.filter(k => PRODUCT_CATEGORIES[k]);
+          // 同じ会社名・ステージが既になければ追加
+          const exists = deals.some(d => d.company===company && d.stage===stageKey);
+          if (!exists) {
+            await addDoc(collection(db,"sales_deals"),{
+              company, products, amount:"", person:"", note:"",
+              stage: stageKey,
+              createdAt: new Date().toISOString(),
+              fromTask: true,
+            });
+          }
+        }
       }
       setShowModal(false);
     } catch(e) { alert("保存に失敗しました: " + e.message); }
@@ -656,7 +676,10 @@ export default function App() {
                         background:"#12151E", borderRadius:10, padding:"10px 11px",
                         border:"1px solid #2A2D3A", cursor:"pointer",
                       }}>
-                        <div style={{fontWeight:700, fontSize:13, marginBottom:5, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{deal.company}</div>
+                        <div style={{display:"flex", alignItems:"center", gap:5, marginBottom:5}}>
+                          <div style={{fontWeight:700, fontSize:13, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis", flex:1}}>{deal.company}</div>
+                          {deal.fromTask && <span style={{fontSize:9, background:"#FBBF2418", color:"#FBBF24", borderRadius:4, padding:"1px 5px", flexShrink:0}}>自動</span>}
+                        </div>
                         {/* 商品バッジ */}
                         {prods.length>0 && (
                           <div style={{display:"flex", gap:4, flexWrap:"wrap", marginBottom:5}}>
