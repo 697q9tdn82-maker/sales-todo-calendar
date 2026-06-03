@@ -137,26 +137,67 @@ function exportToExcel(todos, reportItems) {
     });
   });
 
-  // ── 報告書シート ────────────────────────────────────
+  // ── 1シートにまとめる（上:報告書 / 空行 / 下:タスク一覧） ──
   const todayReport = (reportItems||[]).filter(r=>r.date===toJSTDateStr(new Date()));
-  const repHeaders  = ["本日提出報告書"];
-  const repRows     = todayReport.length>0
-    ? todayReport.map(r=>[r.name])
+  const repHeaderRow = ["本日提出報告書"];
+  const repDataRows  = todayReport.length>0
+    ? todayReport.map(r=>["・"+r.name])
     : [["（本日の報告書なし）"]];
-  const wsRep = XLSX.utils.aoa_to_sheet([repHeaders, ...repRows]);
-  wsRep["!cols"] = [{ wch: 30 }];
-  wsRep["!rows"] = [repHeaders, ...repRows].map(()=>({ hpt: 18 }));
-  // タイトル行スタイル
-  if (wsRep["A1"]) wsRep["A1"].s = {
-    fill:{ patternType:"solid", fgColor:{ rgb:"BDD7EE" } },
-    font:{ bold:true, color:{ rgb:"1F3864" } },
-    alignment:{ horizontal:"center", vertical:"center" },
+  const emptyRow     = [""];
+  const combined     = [
+    repHeaderRow,
+    ...repDataRows,
+    emptyRow,
+    headers,
+    ...rows,
+  ];
+  const wsCombined = XLSX.utils.aoa_to_sheet(combined);
+
+  // 列幅（タスク一覧に合わせる）
+  wsCombined["!cols"] = [
+    { wch: 12 }, { wch: 8 }, { wch: 36 },
+    { wch: 16 }, { wch: 14 }, { wch: 14 },
+    { wch: 8  }, { wch: 8 },
+  ];
+
+  // 全行の高さ
+  wsCombined["!rows"] = combined.map(()=>({ hpt: 18 }));
+
+  const titleFill   = { patternType:"solid", fgColor:{ rgb:"BDD7EE" } };
+  const titleFont   = { bold:true, color:{ rgb:"1F3864" } };
+  const titleBorder = {
+    top:{ style:"thin", color:{ rgb:"9DC3E6" } }, bottom:{ style:"thin", color:{ rgb:"9DC3E6" } },
+    left:{ style:"thin", color:{ rgb:"9DC3E6" } }, right:{ style:"thin", color:{ rgb:"9DC3E6" } },
   };
+  const dataBorder = {
+    top:{ style:"thin", color:{ rgb:"D9D9D9" } }, bottom:{ style:"thin", color:{ rgb:"D9D9D9" } },
+    left:{ style:"thin", color:{ rgb:"D9D9D9" } }, right:{ style:"thin", color:{ rgb:"D9D9D9" } },
+  };
+
+  // 報告書タイトル行スタイル（行0）
+  const repTitleCell = XLSX.utils.encode_cell({ r:0, c:0 });
+  if (wsCombined[repTitleCell]) wsCombined[repTitleCell].s = { fill:titleFill, font:titleFont, border:titleBorder, alignment:{ horizontal:"center", vertical:"center" } };
+
+  // タスク一覧タイトル行スタイル
+  const taskHeaderRow = repDataRows.length + 2; // 報告書ヘッダー + データ行 + 空行
+  headers.forEach((_,i)=>{
+    const cell = XLSX.utils.encode_cell({ r:taskHeaderRow, c:i });
+    if (!wsCombined[cell]) return;
+    wsCombined[cell].s = { fill:titleFill, font:titleFont, border:titleBorder, alignment:{ horizontal:"center", vertical:"center" } };
+  });
+
+  // タスクデータ行ボーダー
+  rows.forEach((_,ri)=>{
+    headers.forEach((_,ci)=>{
+      const cell = XLSX.utils.encode_cell({ r:taskHeaderRow+1+ri, c:ci });
+      if (!wsCombined[cell]) wsCombined[cell] = { t:"s", v:"" };
+      wsCombined[cell].s = { border:dataBorder, alignment:{ vertical:"center" } };
+    });
+  });
 
   // ── ワークブック出力 ────────────────────────────────
   const wb  = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, wsRep, "本日報告書");
-  XLSX.utils.book_append_sheet(wb, ws,    "タスク一覧");
+  XLSX.utils.book_append_sheet(wb, wsCombined, "提出用");
   const now = toJSTDateStr(new Date());
   XLSX.writeFile(wb, "タスク一覧_" + now.replace(/-/g,"") + ".xlsx");
 }
