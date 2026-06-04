@@ -163,16 +163,7 @@ function exportToExcel(todos, reportItems) {
   // 全行の高さ
   wsCombined["!rows"] = combined.map(()=>({ hpt: 18 }));
 
-  const titleFill   = { patternType:"solid", fgColor:{ rgb:"BDD7EE" } };
-  const titleFont   = { bold:true, color:{ rgb:"1F3864" } };
-  const titleBorder = {
-    top:{ style:"thin", color:{ rgb:"9DC3E6" } }, bottom:{ style:"thin", color:{ rgb:"9DC3E6" } },
-    left:{ style:"thin", color:{ rgb:"9DC3E6" } }, right:{ style:"thin", color:{ rgb:"9DC3E6" } },
-  };
-  const dataBorder = {
-    top:{ style:"thin", color:{ rgb:"D9D9D9" } }, bottom:{ style:"thin", color:{ rgb:"D9D9D9" } },
-    left:{ style:"thin", color:{ rgb:"D9D9D9" } }, right:{ style:"thin", color:{ rgb:"D9D9D9" } },
-  };
+  // titleFill/titleFont/titleBorder/dataBorder は上で定義済み
 
   // 報告書タイトル行スタイル（行0）
   const repTitleCell = XLSX.utils.encode_cell({ r:0, c:0 });
