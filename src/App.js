@@ -139,10 +139,16 @@ export default function App() {
   // ── Firestore: タスク ─────────────────────────────
   const [todos, setTodos]   = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "sales_todos"), (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setTodos(data);
+      setLoading(false);
+      setLoadError(null);
+    }, (err) => {
+      console.error("Firestore読み込みエラー:", err);
+      setLoadError(err);
       setLoading(false);
     });
     return () => unsub();
@@ -534,6 +540,23 @@ export default function App() {
   }
 
   // ════════════════════════════════════════════════════
+  if (loadError) return (
+    <div style={{minHeight:"100vh", background:"#0D0F14", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:14, padding:20, textAlign:"center"}}>
+      <div style={{fontSize:34}}>⚠️</div>
+      <div style={{color:"#FF5252", fontSize:16, fontWeight:800}}>データベースに接続できません</div>
+      <div style={{color:"#E8EAF0", fontSize:13, background:"#1A1D26", border:"1px solid #2A2D3A", borderRadius:10, padding:"10px 16px", maxWidth:480, wordBreak:"break-all"}}>
+        {loadError.code || ""} {loadError.message || String(loadError)}
+      </div>
+      {String(loadError.code).includes("permission-denied") && (
+        <div style={{color:"#FBBF24", fontSize:12, maxWidth:440, lineHeight:1.7}}>
+          Firestoreのセキュリティルールで拒否されています。<br/>
+          Firebaseコンソール → Firestore Database → ルール を確認してください(テストモードの期限切れの可能性)
+        </div>
+      )}
+      <button onClick={()=>window.location.reload()} style={{marginTop:6, padding:"9px 22px", borderRadius:10, border:"none", cursor:"pointer", fontSize:13, fontWeight:700, background:"linear-gradient(135deg,#FFD700,#FF8C00)", color:"#0D0F14"}}>再読み込み</button>
+    </div>
+  );
+
   if (loading) return (
     <div style={{minHeight:"100vh", background:"#0D0F14", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16}}>
       <div style={{
