@@ -9,8 +9,8 @@ export default function TodoCard({ todo, showDate=false, onEdit, onDelete, onCyc
   const cats = getCats(todo);
   return (
     <div onDoubleClick={()=>onEdit(todo)} style={{
-      background:"#1A1D26", borderRadius:14, padding:"13px 15px",
-      border:`1px solid ${done?"#2A2D3A":pri.color+"50"}`,
+      background:"#16263F", borderRadius:14, padding:"13px 15px",
+      border:`1px solid ${done?"#2C3E5F":pri.color+"50"}`,
       opacity:done?0.55:1,
       display:"flex", alignItems:"flex-start", gap:11,
       cursor:"pointer",
@@ -39,13 +39,13 @@ export default function TodoCard({ todo, showDate=false, onEdit, onDelete, onCyc
             const cc2=catColor(ck);
             return <span key={ck} style={{fontSize:10, padding:"2px 7px", borderRadius:20, fontWeight:700, background:cc2+"18", color:cc2}}>{c.icon} {c.label}</span>;
           })}
-          {showDate&&<span style={{fontSize:11, color:"#7A7D8A"}}>{fmtDate(todo.date)} {DAYS_JP[new Date(todo.date).getDay()]}曜</span>}
+          {showDate&&<span style={{fontSize:11, color:"#8494B0"}}>{fmtDate(todo.date)} {DAYS_JP[new Date(todo.date).getDay()]}曜</span>}
         </div>
-        {todo.note&&<div style={{fontSize:12, color:"#7A7D8A", marginTop:3}}>{todo.note}</div>}
+        {todo.note&&<div style={{fontSize:12, color:"#8494B0", marginTop:3}}>{todo.note}</div>}
       </div>
       <div style={{display:"flex", gap:5, flexShrink:0}}>
-        <button onClick={()=>onEdit(todo)} style={{background:"#1E2230", border:"none", borderRadius:6, width:28, height:28, cursor:"pointer", color:"#7A7D8A", fontSize:13}}>✏️</button>
-        <button onClick={()=>onDelete(todo.id)} style={{background:"#1E2230", border:"none", borderRadius:6, width:28, height:28, cursor:"pointer", color:"#FF5252", fontSize:13}}>🗑</button>
+        <button onClick={()=>onEdit(todo)} style={{background:"#1C2C48", border:"none", borderRadius:6, width:28, height:28, cursor:"pointer", color:"#8494B0", fontSize:13}}>✏️</button>
+        <button onClick={()=>onDelete(todo.id)} style={{background:"#1C2C48", border:"none", borderRadius:6, width:28, height:28, cursor:"pointer", color:"#FF5252", fontSize:13}}>🗑</button>
       </div>
     </div>
   );

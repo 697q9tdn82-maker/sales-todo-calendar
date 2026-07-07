@@ -8,7 +8,7 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
 
   function fmt(n){ const v=Number(n)||0; return v>=10000?(v/10000).toFixed(1)+"万":v>0?v.toLocaleString():"―"; }
 
-  if (dealsLoading) return <div style={{textAlign:"center",color:"#7A7D8A",padding:"40px"}}>読み込み中...</div>;
+  if (dealsLoading) return <div style={{textAlign:"center",color:"#8494B0",padding:"40px"}}>読み込み中...</div>;
 
   // ステージ別集計
   const stageTotal = (stageKey) => deals
@@ -30,7 +30,7 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
         <div style={{fontWeight:800, fontSize:17}}>🔀 案件パイプライン</div>
         <button onClick={()=>openAddDeal("contact")} style={{
           padding:"7px 16px", borderRadius:9, border:"none", cursor:"pointer", fontSize:13, fontWeight:700,
-          background:"linear-gradient(135deg,#FFD700,#FF8C00)", color:"#0D0F14",
+          background:"linear-gradient(135deg,#FFD700,#FF8C00)", color:"#0A1220",
         }}>+ 案件追加</button>
       </div>
 
@@ -39,10 +39,10 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
         {STAGES.map(s=>{
           const stagDeals = deals.filter(d=>d.stage===s.key);
           return (
-            <div key={s.key} style={{background:"#1A1D26", borderRadius:12, padding:"10px 13px", border:`1px solid ${s.color}30`}}>
+            <div key={s.key} style={{background:"#16263F", borderRadius:12, padding:"10px 13px", border:`1px solid ${s.color}30`}}>
               <div style={{fontSize:10, color:s.color, fontWeight:700, marginBottom:4}}>{s.label}</div>
               <div style={{fontSize:20, fontWeight:800, color:"#E8EAF0", lineHeight:1}}>{stagDeals.length}<span style={{fontSize:11, marginLeft:2}}>件</span></div>
-              <div style={{fontSize:11, color:"#7A7D8A", marginTop:2}}>{fmt(stageTotal(s.key))}円</div>
+              <div style={{fontSize:11, color:"#8494B0", marginTop:2}}>{fmt(stageTotal(s.key))}円</div>
             </div>
           );
         })}
@@ -59,7 +59,7 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
               onDragLeave={()=>setDragOverStage(s=>s===stage.key?null:s)}
               onDrop={e=>onDropStage(e, stage.key)}
               style={{
-                background:"#1A1D26", borderRadius:14,
+                background:"#16263F", borderRadius:14,
                 border:`1px ${isOver?"dashed":"solid"} ${stage.color}${isOver?"":"30"}`,
                 overflow:"hidden",
               }}>
@@ -71,12 +71,12 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
               {/* 案件カード */}
               <div style={{padding:"8px", display:"flex", flexDirection:"column", gap:7, minHeight:120}}>
                 {stageDeals.length===0 && (
-                  <div style={{textAlign:"center", color:"#3A3D4A", fontSize:11, padding:"16px 0"}}>案件なし</div>
+                  <div style={{textAlign:"center", color:"#435470", fontSize:11, padding:"16px 0"}}>案件なし</div>
                 )}
                 {stageDeals.map(deal=>{
                   const prods = (deal.products||[]).map(k=>PRODUCTS.find(p=>p.key===k)).filter(Boolean);
                   const naColor = deal.nextAction
-                    ? (deal.nextAction < todayStr ? "#FF5252" : deal.nextAction===todayStr ? "#FFD700" : "#7A7D8A")
+                    ? (deal.nextAction < todayStr ? "#FF5252" : deal.nextAction===todayStr ? "#FFD700" : "#8494B0")
                     : null;
                   return (
                     <div key={deal.id}
@@ -84,8 +84,8 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
                       onDragStart={e=>e.dataTransfer.setData("text/plain", deal.id)}
                       onDoubleClick={()=>openEditDeal(deal)}
                       style={{
-                        background:"#12151E", borderRadius:10, padding:"10px 11px",
-                        border:"1px solid #2A2D3A", cursor:"grab",
+                        background:"#101D33", borderRadius:10, padding:"10px 11px",
+                        border:"1px solid #2C3E5F", cursor:"grab",
                       }}>
                       <div style={{display:"flex", alignItems:"center", gap:5, marginBottom:5}}>
                         <div style={{fontWeight:700, fontSize:13, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis", flex:1}}>{deal.company}</div>
@@ -101,7 +101,7 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
                       )}
                       <div style={{display:"flex", alignItems:"center", justifyContent:"space-between"}}>
                         <div style={{fontSize:12, color:"#66BB6A", fontWeight:700}}>{fmt(deal.amount)}円</div>
-                        {deal.person && <div style={{fontSize:10, color:"#7A7D8A"}}>👤 {deal.person}</div>}
+                        {deal.person && <div style={{fontSize:10, color:"#8494B0"}}>👤 {deal.person}</div>}
                       </div>
                       {deal.nextAction && (
                         <div style={{fontSize:10, color:naColor, marginTop:4, fontWeight:700}}>
@@ -110,7 +110,7 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
                           {deal.nextAction===todayStr && " (今日)"}
                         </div>
                       )}
-                      {deal.note && <div style={{fontSize:10, color:"#7A7D8A", marginTop:4, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{deal.note}</div>}
+                      {deal.note && <div style={{fontSize:10, color:"#8494B0", marginTop:4, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis"}}>{deal.note}</div>}
                       {/* ステージ移動ボタン */}
                       <div style={{display:"flex", gap:4, marginTop:7}}>
                         {STAGES.filter(s=>s.key!==stage.key).map(s=>(
@@ -128,8 +128,8 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
                   );
                 })}
                 <button onClick={()=>openAddDeal(stage.key)} style={{
-                  width:"100%", background:"transparent", border:"1px dashed #2A2D3A",
-                  borderRadius:8, padding:"6px", cursor:"pointer", color:"#5A5D6A", fontSize:11,
+                  width:"100%", background:"transparent", border:"1px dashed #2C3E5F",
+                  borderRadius:8, padding:"6px", cursor:"pointer", color:"#5D6D8C", fontSize:11,
                 }}>+ 追加</button>
               </div>
             </div>

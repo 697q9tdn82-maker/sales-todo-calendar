@@ -8,7 +8,7 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
   const monthLabel = curMonth + "月";
 
   if (boardLoading || !boardData) return (
-    <div style={{textAlign:"center", color:"#7A7D8A", padding:"40px"}}>読み込み中...</div>
+    <div style={{textAlign:"center", color:"#8494B0", padding:"40px"}}>読み込み中...</div>
   );
 
   const months   = boardData.months || HALF_MONTHS;
@@ -33,7 +33,7 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
   const passedBizDays = getBizDaysPassed(today2.getFullYear(), today2.getMonth()+1);
 
   const inputStyle2 = {
-    background:"#12151E", border:"1px solid #2A2D3A", borderRadius:8,
+    background:"#101D33", border:"1px solid #2C3E5F", borderRadius:8,
     padding:"6px 10px", color:"#E8EAF0", fontSize:13,
     outline:"none", width:"100%", boxSizing:"border-box", textAlign:"right",
   };
@@ -64,8 +64,8 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
         <div style={{fontWeight:800, fontSize:17}}>{boardData.halfLabel || "上期（4〜9月）"} 営業ボード</div>
         <button onClick={()=>setBoardEdit(!boardEdit)} style={{
           padding:"6px 14px", borderRadius:8, border:"none", cursor:"pointer", fontSize:12, fontWeight:700,
-          background:boardEdit?"linear-gradient(135deg,#FFD700,#FF8C00)":"#1E2230",
-          color:boardEdit?"#0D0F14":"#7A7D8A",
+          background:boardEdit?"linear-gradient(135deg,#FFD700,#FF8C00)":"#1C2C48",
+          color:boardEdit?"#0A1220":"#8494B0",
         }}>{boardEdit?"✅ 完了":"✏️ 編集"}</button>
       </div>
 
@@ -82,7 +82,7 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
         const ms         = MILESTONES[prod.key]||[];
 
         return (
-          <div key={prod.key} style={{background:"#1A1D26", borderRadius:16, border:`1px solid ${color}30`, overflow:"hidden"}}>
+          <div key={prod.key} style={{background:"#16263F", borderRadius:16, border:`1px solid ${color}30`, overflow:"hidden"}}>
             {/* 商品ヘッダー */}
             <div style={{background:color+"15", borderBottom:`1px solid ${color}30`, padding:"10px 16px", display:"flex", alignItems:"center", gap:8}}>
               <div style={{width:10, height:10, borderRadius:"50%", background:color}}/>
@@ -100,8 +100,8 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
                   {label:"半期累計", value:fmt(halfResult)+"円", accent:"#66BB6A"},
                   {label:"達成率／残", value:`${halfPct}% / ${fmt(halfRemain<0?0:halfRemain)}円`, accent:halfPct>=100?"#FFD700":halfPct>=70?"#66BB6A":"#FF5252"},
                 ].map(s=>(
-                  <div key={s.label} style={{background:"#12151E", borderRadius:10, padding:"10px 12px"}}>
-                    <div style={{fontSize:10, color:"#7A7D8A", marginBottom:4}}>{s.label}</div>
+                  <div key={s.label} style={{background:"#101D33", borderRadius:10, padding:"10px 12px"}}>
+                    <div style={{fontSize:10, color:"#8494B0", marginBottom:4}}>{s.label}</div>
                     <div style={{fontSize:13, fontWeight:700, color:s.accent}}>{s.value}</div>
                   </div>
                 ))}
@@ -109,14 +109,14 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
 
               {/* 半期プログレスバー */}
               <div>
-                <div style={{height:8, background:"#12151E", borderRadius:4, overflow:"hidden"}}>
+                <div style={{height:8, background:"#101D33", borderRadius:4, overflow:"hidden"}}>
                   <div style={{height:"100%", width:`${Math.min(halfPct,100)}%`, background:`linear-gradient(90deg,${color},${color}99)`, borderRadius:4, transition:"width 0.5s"}}/>
                 </div>
               </div>
 
               {/* 今月 */}
-              <div style={{borderTop:"1px solid #2A2D3A", paddingTop:12}}>
-                <div style={{fontSize:11, color:"#7A7D8A", marginBottom:8, fontWeight:700}}>📅 今月（{monthLabel}） 営業日: {passedBizDays}/{totalBizDays}日</div>
+              <div style={{borderTop:"1px solid #2C3E5F", paddingTop:12}}>
+                <div style={{fontSize:11, color:"#8494B0", marginBottom:8, fontWeight:700}}>📅 今月（{monthLabel}） 営業日: {passedBizDays}/{totalBizDays}日</div>
                 <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:10}}>
                   {[
                     {label:"月次目標", value: boardEdit
@@ -127,21 +127,21 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
                       : fmt(curResult)+"円", accent:"#66BB6A"},
                     {label:"達成率／残", value:`${curPct}% / ${fmt(curRemain<0?0:curRemain)}円`, accent:curPct>=100?"#FFD700":curPct>=70?"#66BB6A":"#FF5252"},
                   ].map(s=>(
-                    <div key={s.label} style={{background:"#12151E", borderRadius:10, padding:"10px 12px"}}>
-                      <div style={{fontSize:10, color:"#7A7D8A", marginBottom:4}}>{s.label}</div>
+                    <div key={s.label} style={{background:"#101D33", borderRadius:10, padding:"10px 12px"}}>
+                      <div style={{fontSize:10, color:"#8494B0", marginBottom:4}}>{s.label}</div>
                       <div style={{fontSize:13, fontWeight:700, color:s.accent}}>{s.value}</div>
                     </div>
                   ))}
                 </div>
                 {/* 今月プログレスバー */}
-                <div style={{height:6, background:"#12151E", borderRadius:4, overflow:"hidden", marginBottom: ms.length?10:0}}>
+                <div style={{height:6, background:"#101D33", borderRadius:4, overflow:"hidden", marginBottom: ms.length?10:0}}>
                   <div style={{height:"100%", width:`${Math.min(curPct,100)}%`, background:`linear-gradient(90deg,${color},${color}99)`, borderRadius:4, transition:"width 0.5s"}}/>
                 </div>
 
                 {/* マイルストーン */}
                 {ms.length>0 && (
                   <div style={{display:"flex", flexDirection:"column", gap:6}}>
-                    <div style={{fontSize:10, color:"#7A7D8A", fontWeight:700}}>🏁 マイルストーン</div>
+                    <div style={{fontSize:10, color:"#8494B0", fontWeight:700}}>🏁 マイルストーン</div>
                     <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
                       {ms.map(m=>{
                         const msTarget   = Math.round((Number(curTarget)||0) * m.pct/100);
@@ -149,13 +149,13 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
                         const isCurrent  = passedBizDays <= m.day && (ms.find(x=>x.day<m.day)===undefined || passedBizDays > (ms.find(x=>x.day<m.day)?.day||0));
                         return (
                           <div key={m.day} style={{
-                            background: reached?"#34C75918":isCurrent?"#FBBF2418":"#12151E",
-                            border:`1px solid ${reached?"#34C759":isCurrent?"#FBBF24":"#2A2D3A"}`,
+                            background: reached?"#34C75918":isCurrent?"#FBBF2418":"#101D33",
+                            border:`1px solid ${reached?"#34C759":isCurrent?"#FBBF24":"#2C3E5F"}`,
                             borderRadius:10, padding:"8px 12px", minWidth:100,
                           }}>
-                            <div style={{fontSize:10, color:reached?"#34C759":isCurrent?"#FBBF24":"#7A7D8A", fontWeight:700}}>{m.day}営業日目 {m.pct}%</div>
+                            <div style={{fontSize:10, color:reached?"#34C759":isCurrent?"#FBBF24":"#8494B0", fontWeight:700}}>{m.day}営業日目 {m.pct}%</div>
                             <div style={{fontSize:12, fontWeight:700, color:reached?"#34C759":isCurrent?"#FBBF24":"#E8EAF0", marginTop:2}}>{fmt(msTarget)}円</div>
-                            <div style={{fontSize:10, color:"#7A7D8A", marginTop:1}}>{reached?"✅ 達成":isCurrent?"← 現在":"未"}</div>
+                            <div style={{fontSize:10, color:"#8494B0", marginTop:1}}>{reached?"✅ 達成":isCurrent?"← 現在":"未"}</div>
                           </div>
                         );
                       })}
@@ -165,14 +165,14 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
               </div>
 
               {/* 月次一覧テーブル */}
-              <div style={{borderTop:"1px solid #2A2D3A", paddingTop:12}}>
-                <div style={{fontSize:11, color:"#7A7D8A", marginBottom:8, fontWeight:700}}>📆 月次推移</div>
+              <div style={{borderTop:"1px solid #2C3E5F", paddingTop:12}}>
+                <div style={{fontSize:11, color:"#8494B0", marginBottom:8, fontWeight:700}}>📆 月次推移</div>
                 <div style={{overflowX:"auto"}}>
                   <table style={{width:"100%", borderCollapse:"collapse", fontSize:12}}>
                     <thead>
                       <tr>
                         {["月","目標","成約","達成率","累計目標","累計成約","累計達成率"].map(h=>(
-                          <th key={h} style={{padding:"6px 8px", background:"#12151E", color:"#7A7D8A", fontWeight:700, textAlign:"right", borderBottom:"1px solid #2A2D3A", whiteSpace:"nowrap"}}>{h}</th>
+                          <th key={h} style={{padding:"6px 8px", background:"#101D33", color:"#8494B0", fontWeight:700, textAlign:"right", borderBottom:"1px solid #2C3E5F", whiteSpace:"nowrap"}}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -185,21 +185,21 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
                         const isThis = m===monthLabel;
                         return (
                           <tr key={m} style={{background:isThis?color+"10":"transparent"}}>
-                            <td style={{padding:"6px 8px", color:isThis?color:"#E8EAF0", fontWeight:isThis?700:400, borderBottom:"1px solid #1E2230"}}>{m}</td>
-                            <td style={{padding:"6px 8px", textAlign:"right", color:"#94A3B8", borderBottom:"1px solid #1E2230"}}>
+                            <td style={{padding:"6px 8px", color:isThis?color:"#E8EAF0", fontWeight:isThis?700:400, borderBottom:"1px solid #1C2C48"}}>{m}</td>
+                            <td style={{padding:"6px 8px", textAlign:"right", color:"#94A3B8", borderBottom:"1px solid #1C2C48"}}>
                               {boardEdit
                                 ? <input type="number" defaultValue={tgt} onBlur={e=>updateField(prod.key,`target_${m}`,e.target.value)} style={{...inputStyle2,width:80}}/>
                                 : fmt(tgt)}
                             </td>
-                            <td style={{padding:"6px 8px", textAlign:"right", color:"#66BB6A", borderBottom:"1px solid #1E2230"}}>
+                            <td style={{padding:"6px 8px", textAlign:"right", color:"#66BB6A", borderBottom:"1px solid #1C2C48"}}>
                               {boardEdit
                                 ? <input type="number" defaultValue={res} onBlur={e=>updateField(prod.key,`result_${m}`,e.target.value)} style={{...inputStyle2,width:80}}/>
                                 : fmt(res)}
                             </td>
-                            <td style={{padding:"6px 8px", textAlign:"right", color:p2>=100?"#FFD700":p2>=70?"#66BB6A":"#FF5252", fontWeight:700, borderBottom:"1px solid #1E2230"}}>{p2}%</td>
-                            <td style={{padding:"6px 8px", textAlign:"right", color:"#94A3B8", borderBottom:"1px solid #1E2230"}}>{fmt(cum.target)}</td>
-                            <td style={{padding:"6px 8px", textAlign:"right", color:"#66BB6A", borderBottom:"1px solid #1E2230"}}>{fmt(cum.result)}</td>
-                            <td style={{padding:"6px 8px", textAlign:"right", color:pct(cum.result,cum.target)>=100?"#FFD700":pct(cum.result,cum.target)>=70?"#66BB6A":"#FF5252", fontWeight:700, borderBottom:"1px solid #1E2230"}}>{pct(cum.result,cum.target)}%</td>
+                            <td style={{padding:"6px 8px", textAlign:"right", color:p2>=100?"#FFD700":p2>=70?"#66BB6A":"#FF5252", fontWeight:700, borderBottom:"1px solid #1C2C48"}}>{p2}%</td>
+                            <td style={{padding:"6px 8px", textAlign:"right", color:"#94A3B8", borderBottom:"1px solid #1C2C48"}}>{fmt(cum.target)}</td>
+                            <td style={{padding:"6px 8px", textAlign:"right", color:"#66BB6A", borderBottom:"1px solid #1C2C48"}}>{fmt(cum.result)}</td>
+                            <td style={{padding:"6px 8px", textAlign:"right", color:pct(cum.result,cum.target)>=100?"#FFD700":pct(cum.result,cum.target)>=70?"#66BB6A":"#FF5252", fontWeight:700, borderBottom:"1px solid #1C2C48"}}>{pct(cum.result,cum.target)}%</td>
                           </tr>
                         );
                       })}

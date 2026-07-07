@@ -1,6 +1,6 @@
 {
-  "short_name": "SalesTask",
-  "name": "Sales Task Manager",
+  "short_name": "ToDoリスト",
+  "name": "ToDoリスト（営業タスク管理）",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,7 +20,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#0D0F14",
-  "background_color": "#0D0F14",
+  "theme_color": "#0A1220",
+  "background_color": "#0A1220",
   "orientation": "portrait"
 }

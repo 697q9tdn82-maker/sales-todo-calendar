@@ -28,11 +28,11 @@ export default function HabitBar({ todos, todayStr, dailyDone }) {
   const R = 24, C = 2*Math.PI*R;
 
   return (
-    <div style={{background:"#1A1D26", borderRadius:14, border:"1px solid #2A2D3A", padding:"12px 14px", marginBottom:10, display:"flex", alignItems:"center", gap:14}}>
+    <div style={{background:"#16263F", borderRadius:14, border:"1px solid #2C3E5F", padding:"12px 14px", marginBottom:10, display:"flex", alignItems:"center", gap:14}}>
       {/* 達成率リング */}
       <div style={{position:"relative", width:60, height:60, flexShrink:0}}>
         <svg width="60" height="60" viewBox="0 0 60 60" style={{transform:"rotate(-90deg)"}}>
-          <circle cx="30" cy="30" r={R} fill="none" stroke="#12151E" strokeWidth="6"/>
+          <circle cx="30" cy="30" r={R} fill="none" stroke="#101D33" strokeWidth="6"/>
           <circle cx="30" cy="30" r={R} fill="none" stroke={pct>=100?"#FFD700":"#4FC3F7"} strokeWidth="6"
             strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C*(1-pct/100)}
             style={{transition:"stroke-dashoffset 0.5s"}}/>
@@ -43,13 +43,13 @@ export default function HabitBar({ todos, todayStr, dailyDone }) {
       </div>
       {/* 今日の実績 + ストリーク */}
       <div style={{flexShrink:0}}>
-        <div style={{fontSize:10, color:"#7A7D8A"}}>今日の達成</div>
-        <div style={{fontSize:15, fontWeight:800, color:"#E8EAF0"}}>{doneCount}<span style={{fontSize:11, color:"#7A7D8A"}}> / {total}件</span></div>
-        <div style={{fontSize:11, color:streak>0?"#FF9500":"#5A5D6A", fontWeight:700, marginTop:2}}>🔥 {streak}日連続</div>
+        <div style={{fontSize:10, color:"#8494B0"}}>今日の達成</div>
+        <div style={{fontSize:15, fontWeight:800, color:"#E8EAF0"}}>{doneCount}<span style={{fontSize:11, color:"#8494B0"}}> / {total}件</span></div>
+        <div style={{fontSize:11, color:streak>0?"#FF9500":"#5D6D8C", fontWeight:700, marginTop:2}}>🔥 {streak}日連続</div>
       </div>
       {/* 週間グラフ */}
       <div style={{flex:1, minWidth:0}}>
-        <div style={{fontSize:10, color:"#7A7D8A", marginBottom:4, textAlign:"right"}}>過去7日の完了数</div>
+        <div style={{fontSize:10, color:"#8494B0", marginBottom:4, textAlign:"right"}}>過去7日の完了数</div>
         <div style={{display:"flex", gap:4, alignItems:"flex-end", height:34}}>
           {week.map(w=>(
             <div key={w.ds} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2, minWidth:0}}>
@@ -59,7 +59,7 @@ export default function HabitBar({ todos, todayStr, dailyDone }) {
                 background: w.ds===todayStr ? "#FFD700" : "#4FC3F7",
                 opacity: w.v>0 ? 0.9 : 0.2,
               }}/>
-              <span style={{fontSize:8, color:w.ds===todayStr?"#FFD700":"#5A5D6A"}}>{DAYS_JP[w.dow]}</span>
+              <span style={{fontSize:8, color:w.ds===todayStr?"#FFD700":"#5D6D8C"}}>{DAYS_JP[w.dow]}</span>
             </div>
           ))}
         </div>
