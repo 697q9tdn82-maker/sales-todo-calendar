@@ -37,14 +37,19 @@ function fmtMD(s) {
 // ── 一言 → タスクに変換 ─────────────────────────────
 function parseTask(text) {
   let t = text.trim();
-  let priority = "medium";
+  let priority = "low"; // 何も付けなければ通常
   let date = null;
 
-  // 「!」で緊急
-  if (/^[!！]|[!！]$/.test(t)) {
-    priority = "high";
+  // 「!!」で緊急、「!」で重要（先頭 or 末尾）
+  const bang = t.match(/^[!！]+|[!！]+$/g);
+  if (bang) {
+    const n = Math.max(...bang.map((b) => b.length));
+    priority = n >= 2 ? "high" : "medium";
     t = t.replace(/^[!！]+|[!！]+$/g, "").trim();
   }
+  // 「緊急」「重要」の単語でも指定可
+  if (/緊急/.test(t)) { priority = "high";   t = t.replace(/緊急/g, " "); }
+  else if (/重要/.test(t)) { priority = "medium"; t = t.replace(/重要/g, " "); }
 
   const take = (re, fn) => {
     if (date) return;
@@ -139,8 +144,12 @@ const HELP = [
   "▶ タスク登録：そのまま一言送るだけ",
   "  例）明日 山田商事 折り返し",
   "  例）金曜 鈴木工業 見積送付",
-  "  例）!田中商店 至急電話 ← 先頭に!で緊急",
   "  日付なし → 今日",
+  "",
+  "▶ 優先度（何も付けなければ🟢通常）",
+  "  例）!山田商事 折り返し ← !で🟠重要",
+  "  例）!!田中商店 至急電話 ← !!で🔴緊急",
+  "  「重要」「緊急」と書いてもOK",
   "",
   "▶ 一覧：「一覧」or「今日」",
   "▶ 完了：「1 済」（複数なら「1 3 済」）",
