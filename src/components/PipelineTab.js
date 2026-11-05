@@ -3,12 +3,10 @@ import { STAGES, PRODUCTS } from "../constants";
 
 // ── 案件パイプライン(かんばん) ────────────────────────
 // ドラッグ&ドロップでステージ移動可(PCはドラッグ、スマホは従来のボタン)
-export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal, openEditDeal, deleteDeal, moveDeal }) {
+export default function PipelineTab({ deals, todayStr, openAddDeal, openEditDeal, moveDeal }) {
   const [dragOverStage, setDragOverStage] = useState(null);
 
   function fmt(n){ const v=Number(n)||0; return v>=10000?(v/10000).toFixed(1)+"万":v>0?v.toLocaleString():"―"; }
-
-  if (dealsLoading) return <div style={{textAlign:"center",color:"#8494B0",padding:"40px"}}>読み込み中...</div>;
 
   // ステージ別集計
   const stageTotal = (stageKey) => deals
@@ -82,10 +80,10 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
                     <div key={deal.id}
                       draggable
                       onDragStart={e=>e.dataTransfer.setData("text/plain", deal.id)}
-                      onDoubleClick={()=>openEditDeal(deal)}
+                      onClick={()=>openEditDeal(deal)}
                       style={{
                         background:"#101D33", borderRadius:10, padding:"10px 11px",
-                        border:"1px solid #2C3E5F", cursor:"grab",
+                        border:"1px solid #2C3E5F", cursor:"pointer",
                       }}>
                       <div style={{display:"flex", alignItems:"center", gap:5, marginBottom:5}}>
                         <div style={{fontWeight:700, fontSize:13, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis", flex:1}}>{deal.company}</div>
@@ -119,10 +117,6 @@ export default function PipelineTab({ deals, dealsLoading, todayStr, openAddDeal
                             background:s.color+"10", color:s.color, cursor:"pointer", fontSize:9, fontWeight:700,
                           }}>{s.label}</button>
                         ))}
-                        <button onClick={e=>{e.stopPropagation();deleteDeal(deal.id);}} style={{
-                          padding:"3px 6px", borderRadius:6, border:"1px solid #FF525250",
-                          background:"#FF525210", color:"#FF5252", cursor:"pointer", fontSize:9,
-                        }}>🗑</button>
                       </div>
                     </div>
                   );

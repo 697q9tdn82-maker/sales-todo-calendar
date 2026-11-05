@@ -82,7 +82,7 @@ function buildMessage(todos, biz) {
   });
   const high = todos.filter((t) => t.priority === "high").length;
   const sub  = high > 0 ? `（うち緊急${high}件）` : "";
-  return `${head}\n\n📋 今日のタスク ${todos.length}件${sub}\n${lines.join("\n")}\n\n終わったら「1 済」で消せるよ`;
+  return `${head}\n\n📋 今日のタスク ${todos.length}件${sub}\n${lines.join("\n")}\n\n終わったら「1 済」で消せるよ\n📝 報告書は「報告 会社名」で登録`;
 }
 
 async function push(text) {

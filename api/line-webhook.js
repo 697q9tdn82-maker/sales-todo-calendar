@@ -34,6 +34,40 @@ function fmtMD(s) {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${WD_JP[d.getUTCDay()]})`;
 }
 
+// ── 祝日・繰り返し ───────────────────────────────────
+const JP_HOLIDAYS = new Set([
+  "2026-01-01","2026-01-12","2026-02-11","2026-02-23","2026-03-20",
+  "2026-04-29","2026-05-03","2026-05-04","2026-05-05","2026-05-06",
+  "2026-07-20","2026-08-11","2026-09-21","2026-09-22","2026-09-23",
+  "2026-10-12","2026-11-03","2026-11-23",
+  "2027-01-01","2027-01-11","2027-02-11","2027-02-23","2027-03-22",
+  "2027-04-29","2027-05-03","2027-05-04","2027-05-05","2027-07-19",
+  "2027-08-11","2027-09-20","2027-09-23","2027-10-11","2027-11-03",
+  "2027-11-23",
+]);
+function addDaysStr(s, n) { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return ymd(d); }
+function isBizStr(s) { const w = new Date(s + "T00:00:00Z").getUTCDay(); return w !== 0 && w !== 6 && !JP_HOLIDAYS.has(s); }
+function nextRepeatDate(s, repeat) {
+  if (repeat === "weekly") return addDaysStr(s, 7);
+  if (repeat === "bizdaily") { let n = addDaysStr(s, 1), g = 0; while (!isBizStr(n) && g++ < 14) n = addDaysStr(n, 1); return n; }
+  if (repeat === "monthly") {
+    const d = new Date(s + "T00:00:00Z"), day = d.getUTCDate();
+    d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + 1);
+    const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+    d.setUTCDate(Math.min(day, last)); return ymd(d);
+  }
+  return addDaysStr(s, 1);
+}
+async function createRepeat(t) {
+  if (!["daily", "bizdaily", "weekly", "monthly"].includes(t.repeat)) return;
+  const base = t.date && t.date >= todayStr() ? t.date : todayStr();
+  await addDoc(collection(db, "sales_todos"), {
+    title: t.title, date: nextRepeatDate(base, t.repeat), priority: t.priority || "low",
+    categories: t.categories || [], status: "undone", done: false, note: t.note || "",
+    repeat: t.repeat, createdAt: new Date().toISOString(),
+  });
+}
+
 // ── 一言 → タスクに変換 ─────────────────────────────
 function parseTask(text) {
   let t = text.trim();
@@ -151,9 +185,11 @@ const HELP = [
   "  例）!!田中商店 至急電話 ← !!で🔴緊急",
   "  「重要」「緊急」と書いてもOK",
   "",
-  "▶ 一覧：「一覧」or「今日」",
+  "▶ 一覧：「一覧」or「今日」／明日の分は「明日」",
   "▶ 完了：「1 済」（複数なら「1 3 済」）",
   "▶ 着手中：「2 着手」",
+  "▶ 報告書：「報告 山田商事 鈴木工業」で今日の分に追加",
+  "  「報告」だけで今日の一覧",
 ].join("\n");
 
 // ── イベント処理 ─────────────────────────────────────
@@ -178,6 +214,32 @@ async function handleEvent(ev) {
   // ヘルプ
   if (/^(ヘルプ|使い方|help|\?|？)$/i.test(text)) { await reply(ev.replyToken, HELP); return; }
 
+  // 報告書：「報告 山田商事 鈴木工業」で今日の報告書に追加、「報告」だけで確認
+  const rep = text.match(/^報告書?(?:[\s:：]+([\s\S]*))?$/);
+  if (rep) {
+    const names = (rep[1] || "").split(/[\s、,，\n]+/).map((x) => x.trim()).filter(Boolean);
+    for (const name of names) {
+      await addDoc(collection(db, "sales_reports"), { date: todayStr(), name, createdAt: new Date().toISOString(), source: "line" });
+    }
+    const snap = await getDocs(query(collection(db, "sales_reports"), where("date", "==", todayStr())));
+    const all = snap.docs.map((d) => d.data().name);
+    const head = names.length ? `📝 報告書に追加したよ（${names.length}社）` : "📝 本日の報告書";
+    await reply(ev.replyToken, all.length ? `${head}\n${all.map((n) => "・" + n).join("\n")}` : "📝 本日の報告書はまだなし\n「報告 会社名」で追加できるよ");
+    return;
+  }
+
+  // 明日のタスク
+  if (/^(明日|あした|あす)$/.test(text)) {
+    const tmr = jstAdd(1);
+    const snap = await getDocs(query(collection(db, "sales_todos"), where("date", "==", tmr)));
+    const list = snap.docs.map((d) => d.data()).filter((t) => !isDone(t)).sort((a, b) => (RANK[a.priority] ?? 2) - (RANK[b.priority] ?? 2));
+    const mark = { high: "🔴", medium: "🟠", low: "🟢" };
+    await reply(ev.replyToken, list.length
+      ? `📅 明日 ${fmtMD(tmr)} のタスク ${list.length}件\n${list.map((t) => `・${mark[t.priority] || "🟢"} ${t.title}`).join("\n")}`
+      : `📅 明日 ${fmtMD(tmr)} のタスクはまだなし`);
+    return;
+  }
+
   // 一覧
   if (/^(一覧|今日|きょう|リスト|タスク)$/.test(text)) {
     await reply(ev.replyToken, listText(await getActiveTodos()));
@@ -197,7 +259,8 @@ async function handleEvent(ev) {
       const t = todos[n - 1];
       if (!t) continue;
       await updateDoc(doc(db, "sales_todos", t.id),
-        toProg ? { status: "progress", done: false } : { status: "done", done: true });
+        toProg ? { status: "progress", done: false } : { status: "done", done: true, doneAt: new Date().toISOString() });
+      if (!toProg) await createRepeat(t);
       hit.push(t.title);
     }
     if (hit.length === 0) { await reply(ev.replyToken, "⚠️ その番号のタスクが見つからないよ。「一覧」で番号を確認してね"); return; }

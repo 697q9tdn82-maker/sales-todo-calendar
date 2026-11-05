@@ -1,36 +1,35 @@
-import { HALF_MONTHS, MILESTONES, PROD_COLORS } from "../constants";
-import { getBizDaysInMonth, getBizDaysPassed } from "../utils";
+import { useState } from "react";
+import { MILESTONES, PROD_COLORS } from "../constants";
+import { bizInfo } from "../utils";
 
-// ── 営業ボード(目標・実績管理) ────────────────────────
-export default function BoardTab({ boardData, setBoardData, saveBoardData, boardLoading, boardEdit, setBoardEdit }) {
-  const today2  = new Date();
-  const curMonth = today2.getMonth()+1;
-  const monthLabel = curMonth + "月";
+// ── 営業ボード(目標・実績管理)。半期ごと(上期4〜9月/下期10〜3月)に保存 ──
+export default function BoardTab({ half, isCurrentHalf, onShiftHalf, boardData, saveBoardData, today }) {
+  const [boardEdit, setBoardEdit] = useState(false);
+  const monthLabel = `${Number(today.slice(5, 7))}月`;
 
-  if (boardLoading || !boardData) return (
+  if (!boardData) return (
     <div style={{textAlign:"center", color:"#8494B0", padding:"40px"}}>読み込み中...</div>
   );
 
-  const months   = boardData.months || HALF_MONTHS;
+  const months   = half.months;
   const products = boardData.products || [];
 
-  // 今月インデックス
-  const curIdx = months.findIndex(m => m === monthLabel);
+  // 今月インデックス(別の半期を表示中なら -1)
+  const curIdx = isCurrentHalf ? months.findIndex(m => m === monthLabel) : -1;
 
   // 累計集計
   function cumulative(prod, upToMonth) {
     const idx = months.indexOf(upToMonth);
     let target=0, result=0;
     for(let i=0;i<=idx;i++){
-      target += Number(prod.monthlyTargets[months[i]])||0;
-      result += Number(prod.monthlyResults[months[i]])||0;
+      target += Number(prod.monthlyTargets?.[months[i]])||0;
+      result += Number(prod.monthlyResults?.[months[i]])||0;
     }
     return {target, result};
   }
 
   // 今月の営業日数
-  const totalBizDays  = getBizDaysInMonth(today2.getFullYear(), today2.getMonth()+1);
-  const passedBizDays = getBizDaysPassed(today2.getFullYear(), today2.getMonth()+1);
+  const { total: totalBizDays, passed: passedBizDays } = bizInfo(today);
 
   const inputStyle2 = {
     background:"#101D33", border:"1px solid #2C3E5F", borderRadius:8,
@@ -49,19 +48,24 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
     const newData = JSON.parse(JSON.stringify(boardData));
     const p = newData.products.find(p=>p.key===pKey);
     if(!p) return;
+    p.monthlyTargets = p.monthlyTargets || {};
+    p.monthlyResults = p.monthlyResults || {};
     if(field==="halfTarget") p.halfTarget = Number(val)||0;
     else if(field.startsWith("target_")) p.monthlyTargets[field.replace("target_","")] = Number(val)||0;
     else if(field.startsWith("result_")) p.monthlyResults[field.replace("result_","")] = Number(val)||0;
-    setBoardData(newData);
     await saveBoardData(newData);
   }
 
   return (
-    <div style={{display:"flex", flexDirection:"column", gap:16}}>
+    <div key={half.id} style={{display:"flex", flexDirection:"column", gap:16}}>
 
       {/* ヘッダー */}
       <div style={{display:"flex", alignItems:"center", justifyContent:"space-between"}}>
-        <div style={{fontWeight:800, fontSize:17}}>{boardData.halfLabel || "上期（4〜9月）"} 営業ボード</div>
+        <div style={{display:"flex", alignItems:"center", gap:6}}>
+          <button onClick={()=>onShiftHalf(-1)} style={{background:"#101D33", border:"1px solid #2C3E5F", borderRadius:8, width:30, height:30, color:"#E8EAF0", cursor:"pointer"}}>‹</button>
+          <div style={{fontWeight:800, fontSize:15}}>{half.label}{isCurrentHalf && <span style={{color:"#FFD700", fontSize:11, marginLeft:6}}>今期</span>}</div>
+          <button onClick={()=>onShiftHalf(1)} style={{background:"#101D33", border:"1px solid #2C3E5F", borderRadius:8, width:30, height:30, color:"#E8EAF0", cursor:"pointer"}}>›</button>
+        </div>
         <button onClick={()=>setBoardEdit(!boardEdit)} style={{
           padding:"6px 14px", borderRadius:8, border:"none", cursor:"pointer", fontSize:12, fontWeight:700,
           background:boardEdit?"linear-gradient(135deg,#FFD700,#FF8C00)":"#1C2C48",
@@ -72,11 +76,11 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
       {/* 商品別カード */}
       {products.map(prod => {
         const color = PROD_COLORS[prod.key]||"#94A3B8";
-        const halfResult = months.reduce((s,m)=>s+(Number(prod.monthlyResults[m])||0),0);
+        const halfResult = months.reduce((s,m)=>s+(Number(prod.monthlyResults?.[m])||0),0);
         const halfPct    = pct(halfResult, prod.halfTarget);
         const halfRemain = (Number(prod.halfTarget)||0) - halfResult;
-        const curTarget  = curIdx>=0 ? (Number(prod.monthlyTargets[monthLabel])||0) : 0;
-        const curResult  = curIdx>=0 ? (Number(prod.monthlyResults[monthLabel])||0) : 0;
+        const curTarget  = curIdx>=0 ? (Number(prod.monthlyTargets?.[monthLabel])||0) : 0;
+        const curResult  = curIdx>=0 ? (Number(prod.monthlyResults?.[monthLabel])||0) : 0;
         const curPct     = pct(curResult, curTarget);
         const curRemain  = curTarget - curResult;
         const ms         = MILESTONES[prod.key]||[];
@@ -115,7 +119,7 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
               </div>
 
               {/* 今月 */}
-              <div style={{borderTop:"1px solid #2C3E5F", paddingTop:12}}>
+              {curIdx>=0 && <div style={{borderTop:"1px solid #2C3E5F", paddingTop:12}}>
                 <div style={{fontSize:11, color:"#8494B0", marginBottom:8, fontWeight:700}}>📅 今月（{monthLabel}） 営業日: {passedBizDays}/{totalBizDays}日</div>
                 <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:10}}>
                   {[
@@ -146,7 +150,7 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
                       {ms.map(m=>{
                         const msTarget   = Math.round((Number(curTarget)||0) * m.pct/100);
                         const reached    = curResult >= msTarget;
-                        const isCurrent  = passedBizDays <= m.day && (ms.find(x=>x.day<m.day)===undefined || passedBizDays > (ms.find(x=>x.day<m.day)?.day||0));
+                        const isCurrent  = !reached && ms.find(x=>x.day>=passedBizDays)?.day===m.day;
                         return (
                           <div key={m.day} style={{
                             background: reached?"#34C75918":isCurrent?"#FBBF2418":"#101D33",
@@ -162,7 +166,7 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
                     </div>
                   </div>
                 )}
-              </div>
+              </div>}
 
               {/* 月次一覧テーブル */}
               <div style={{borderTop:"1px solid #2C3E5F", paddingTop:12}}>
@@ -178,8 +182,8 @@ export default function BoardTab({ boardData, setBoardData, saveBoardData, board
                     </thead>
                     <tbody>
                       {months.map((m,i)=>{
-                        const tgt = Number(prod.monthlyTargets[m])||0;
-                        const res = Number(prod.monthlyResults[m])||0;
+                        const tgt = Number(prod.monthlyTargets?.[m])||0;
+                        const res = Number(prod.monthlyResults?.[m])||0;
                         const p2  = pct(res,tgt);
                         const cum = cumulative(prod,m);
                         const isThis = m===monthLabel;

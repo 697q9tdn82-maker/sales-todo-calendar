@@ -1,6 +1,6 @@
 import XLSX from "xlsx-js-style";
 import { ACTION_CATEGORIES, PRODUCT_CATEGORIES, CONTACT_CATEGORIES, PRIORITIES, STATUSES, DAYS_JP } from "./constants";
-import { toJSTDateStr, getCats, todoStatus } from "./utils";
+import { toJSTDateStr, getCats, todoStatus, dowOf } from "./utils";
 
 // ── Excel出力（今西さん提出用） ────────────────────────
 // xlsx-js-style を使用しているため、セルの塗りつぶし・罫線・フォントが実際に反映される
@@ -11,14 +11,13 @@ export function exportToExcel(todos, reportItems) {
     .filter(t => { const s = todoStatus(t); return s==="undone"||s==="progress"; })
     .sort((a,b) => a.date.localeCompare(b.date))
     .map(t => {
-      const d    = new Date(t.date);
       const cats = getCats(t);
       const actions  = cats.filter(k=>ACTION_CATEGORIES[k]).map(k=>ACTION_CATEGORIES[k].label).join("・");
       const products = cats.filter(k=>PRODUCT_CATEGORIES[k]).map(k=>PRODUCT_CATEGORIES[k].label).join("・");
       const contacts = cats.filter(k=>CONTACT_CATEGORIES[k]).map(k=>CONTACT_CATEGORIES[k].label).join("・");
       return [
         t.date,
-        DAYS_JP[d.getDay()] + "曜日",
+        DAYS_JP[dowOf(t.date)] + "曜日",
         t.title,
         actions,
         products,

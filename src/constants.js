@@ -1,5 +1,12 @@
 // ── 共通定数 ──────────────────────────────────────────
 
+// 画面の配色(ネイビーテーマ)
+export const C = {
+  bg:"#0A1220", panel:"#16263F", panel2:"#101D33", line:"#2C3E5F", chip:"#1C2C48",
+  text:"#E8EAF0", sub:"#8494B0", dim:"#5D6D8C", faint:"#435470",
+  gold:"#FFD700", grad:"linear-gradient(135deg,#FFD700,#FF8C00)", red:"#FF5252", green:"#34C759",
+};
+
 export const PRIORITIES = {
   high:   { label: "緊急", color: "#FF4444", bg: "#FF444418" },
   medium: { label: "重要", color: "#FF9500", bg: "#FF950018" },
@@ -52,14 +59,6 @@ export const REPEATS = {
   monthly:    { label: "毎月" },
 };
 
-// ── タスクテンプレート(初期値) ────────────────────────
-export const DEFAULT_TEMPLATES = [
-  { name: "TELアポ",    title: "TELアポ架電",   categories: ["contact","tel_office"],  priority: "medium" },
-  { name: "提案書",     title: "提案書作成",     categories: ["proposal"],              priority: "high" },
-  { name: "フォロー",   title: "フォロー電話",   categories: ["followup","tel_mobile"], priority: "medium" },
-  { name: "日報",       title: "日報作成",       categories: ["admin"],                 priority: "low" },
-];
-
 // ── 案件パイプライン ──────────────────────────────────
 export const STAGES = [
   { key:"contact",  label:"初回接触", color:"#60A5FA" },
@@ -75,7 +74,6 @@ export const PRODUCTS = [
   { key:"news",       label:"ニュース", color:"#60A5FA" },
 ];
 export const PROD_COLORS = { membership:"#A78BFA", cosmos:"#34D399", news:"#60A5FA" };
-export const HALF_MONTHS = ["4月","5月","6月","7月","8月","9月"]; // 上期デフォルト
 export const MILESTONES = {
   membership: [{day:5,pct:45},{day:10,pct:65},{day:15,pct:100}],
   news:       [{day:5,pct:85},{day:15,pct:100}],
