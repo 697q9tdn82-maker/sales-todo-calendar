@@ -18,6 +18,13 @@ const firebaseConfig = {
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
+// ── データの置き場所 ─────────────────────────────────────
+// Vercelの環境変数 SALES_VAULT_KEY（アプリの合言葉と同じもの）があれば、その下を読み書きする。
+// まだ設定していない間は、以前の場所を使う（設定前に動かなくならないように）
+const VAULT = process.env.SALES_VAULT_KEY;
+const col = (name) => (VAULT ? collection(db, "vault", VAULT, name) : collection(db, name));
+const ref = (name, id) => (VAULT ? doc(db, "vault", VAULT, name, id) : doc(db, name, id));
+
 // ── LINE設定（Vercelの環境変数） ──────────────────────
 const SECRET  = process.env.LINE_CHANNEL_SECRET;
 const TOKEN   = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -61,7 +68,7 @@ function nextRepeatDate(s, repeat) {
 async function createRepeat(t) {
   if (!["daily", "bizdaily", "weekly", "monthly"].includes(t.repeat)) return;
   const base = t.date && t.date >= todayStr() ? t.date : todayStr();
-  await addDoc(collection(db, "sales_todos"), {
+  await addDoc(col("sales_todos"), {
     title: t.title, date: nextRepeatDate(base, t.repeat), priority: t.priority || "low",
     categories: t.categories || [], status: "undone", done: false, note: t.note || "",
     repeat: t.repeat, createdAt: new Date().toISOString(),
@@ -141,7 +148,7 @@ const RANK = { high: 0, medium: 1, low: 2 };
 const isDone = (t) => t.status === "done" || t.done;
 
 async function getActiveTodos() {
-  const snap = await getDocs(query(collection(db, "sales_todos"), where("date", "<=", todayStr())));
+  const snap = await getDocs(query(col("sales_todos"), where("date", "<=", todayStr())));
   return snap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
     .filter((t) => !isDone(t))
@@ -219,9 +226,9 @@ async function handleEvent(ev) {
   if (rep) {
     const names = (rep[1] || "").split(/[\s、,，\n]+/).map((x) => x.trim()).filter(Boolean);
     for (const name of names) {
-      await addDoc(collection(db, "sales_reports"), { date: todayStr(), name, createdAt: new Date().toISOString(), source: "line" });
+      await addDoc(col("sales_reports"), { date: todayStr(), name, createdAt: new Date().toISOString(), source: "line" });
     }
-    const snap = await getDocs(query(collection(db, "sales_reports"), where("date", "==", todayStr())));
+    const snap = await getDocs(query(col("sales_reports"), where("date", "==", todayStr())));
     const all = snap.docs.map((d) => d.data().name);
     const head = names.length ? `📝 報告書に追加したよ（${names.length}社）` : "📝 本日の報告書";
     await reply(ev.replyToken, all.length ? `${head}\n${all.map((n) => "・" + n).join("\n")}` : "📝 本日の報告書はまだなし\n「報告 会社名」で追加できるよ");
@@ -231,7 +238,7 @@ async function handleEvent(ev) {
   // 明日のタスク
   if (/^(明日|あした|あす)$/.test(text)) {
     const tmr = jstAdd(1);
-    const snap = await getDocs(query(collection(db, "sales_todos"), where("date", "==", tmr)));
+    const snap = await getDocs(query(col("sales_todos"), where("date", "==", tmr)));
     const list = snap.docs.map((d) => d.data()).filter((t) => !isDone(t)).sort((a, b) => (RANK[a.priority] ?? 2) - (RANK[b.priority] ?? 2));
     const mark = { high: "🔴", medium: "🟠", low: "🟢" };
     await reply(ev.replyToken, list.length
@@ -258,7 +265,7 @@ async function handleEvent(ev) {
     for (const n of nums) {
       const t = todos[n - 1];
       if (!t) continue;
-      await updateDoc(doc(db, "sales_todos", t.id),
+      await updateDoc(ref("sales_todos", t.id),
         toProg ? { status: "progress", done: false } : { status: "done", done: true, doneAt: new Date().toISOString() });
       if (!toProg) await createRepeat(t);
       hit.push(t.title);
@@ -273,7 +280,7 @@ async function handleEvent(ev) {
   // それ以外 → タスク登録
   const task = parseTask(text);
   if (!task) { await reply(ev.replyToken, HELP); return; }
-  await addDoc(collection(db, "sales_todos"), {
+  await addDoc(col("sales_todos"), {
     title: task.title,
     date: task.date,
     priority: task.priority,

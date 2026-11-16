@@ -1,7 +1,7 @@
 // api/morning-push.js
 // 毎朝、今日のタスクをLINEに通知する（cron-job.org から叩く）
 const { initializeApp, getApps } = require("firebase/app");
-const { getFirestore, collection, getDocs, query, where } = require("firebase/firestore");
+const { getFirestore, collection, doc, getDocs, query, where } = require("firebase/firestore");
 
 const firebaseConfig = {
   apiKey: "AIzaSyB5eSZLCsrCCuUKXdmKwZyUxqlNbPBpZoI",
@@ -13,6 +13,13 @@ const firebaseConfig = {
 };
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db  = getFirestore(app);
+
+// ── データの置き場所 ─────────────────────────────────────
+// Vercelの環境変数 SALES_VAULT_KEY（アプリの合言葉と同じもの）があれば、その下を読み書きする。
+// まだ設定していない間は、以前の場所を使う（設定前に動かなくならないように）
+const VAULT = process.env.SALES_VAULT_KEY;
+const col = (name) => (VAULT ? collection(db, "vault", VAULT, name) : collection(db, name));
+const ref = (name, id) => (VAULT ? doc(db, "vault", VAULT, name, id) : doc(db, name, id));
 
 const TOKEN    = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 const USER_ID  = process.env.LINE_ALLOWED_USER_ID;
@@ -60,7 +67,7 @@ function bizInfo() {
 const RANK = { high: 0, medium: 1, low: 2 };
 const isDone = (t) => t.status === "done" || t.done;
 async function getActiveTodos() {
-  const snap = await getDocs(query(collection(db, "sales_todos"), where("date", "<=", todayStr())));
+  const snap = await getDocs(query(col("sales_todos"), where("date", "<=", todayStr())));
   return snap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
     .filter((t) => !isDone(t))

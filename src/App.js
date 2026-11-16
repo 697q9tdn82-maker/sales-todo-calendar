@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc } from "firebase/firestore";
+import { onSnapshot, addDoc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 
-import { db } from "./firebase";
+import { col, ref } from "./vault";
 import { C, ACTION_CATEGORIES, PIPELINE_ACTIONS, PRODUCT_CATEGORIES, PRODUCTS, REPEATS } from "./constants";
 import { todayJST, halfOf, shiftHalf, isDoneTodo, todoStatus, nextRepeatDate } from "./utils";
 import TodayTab from "./components/TodayTab";
@@ -17,7 +17,7 @@ const TABS = [["today", "今日", "⚡"], ["calendar", "カレンダー", "📅"
 // Firestoreのコレクションをリアルタイム購読
 function useCollection(name) {
   const [state, setState] = useState({ items: [], loading: true, error: null });
-  useEffect(() => onSnapshot(collection(db, name),
+  useEffect(() => onSnapshot(col(name),
     (snap) => setState({ items: snap.docs.map((d) => ({ id: d.id, ...d.data() })), loading: false, error: null }),
     (error) => { console.error(error); setState((s) => ({ ...s, loading: false, error })); }), [name]);
   return state;
@@ -32,11 +32,11 @@ function useBoard(halfId) {
   useEffect(() => {
     setData(null);
     let legacyUnsub = null;
-    const unsub = onSnapshot(doc(db, "sales_board", halfId), (snap) => {
+    const unsub = onSnapshot(ref("sales_board", halfId), (snap) => {
       if (legacyUnsub) { legacyUnsub(); legacyUnsub = null; }
       if (snap.exists()) { setData(snap.data()); return; }
       if (halfId === "2026H1") {
-        legacyUnsub = onSnapshot(doc(db, "sales_board", "main"), (s2) => setData(s2.exists() ? s2.data() : emptyBoard()));
+        legacyUnsub = onSnapshot(ref("sales_board", "main"), (s2) => setData(s2.exists() ? s2.data() : emptyBoard()));
       } else setData(emptyBoard());
     }, () => setData(emptyBoard()));
     return () => { unsub(); if (legacyUnsub) legacyUnsub(); };
@@ -74,7 +74,7 @@ export default function App() {
     todos.filter((t) => t.date && t.date < today && !isDoneTodo(t)).forEach((t) => {
       if (carried.current.has(t.id)) return;
       carried.current.add(t.id);
-      updateDoc(doc(db, "sales_todos", t.id), { date: today, carriedFrom: t.carriedFrom || t.date })
+      updateDoc(ref("sales_todos", t.id), { date: today, carriedFrom: t.carriedFrom || t.date })
         .catch(() => carried.current.delete(t.id));
     });
   }, [todos, today]);
@@ -85,7 +85,7 @@ export default function App() {
     const base = todo.date && todo.date >= today ? todo.date : today;
     const nd = nextRepeatDate(base, todo.repeat);
     if (todos.some((t) => t.title === todo.title && t.date === nd && t.repeat === todo.repeat && !isDoneTodo(t))) return;
-    await addDoc(collection(db, "sales_todos"), {
+    await addDoc(col("sales_todos"), {
       title: todo.title, date: nd, priority: todo.priority || "low", categories: todo.categories || [],
       status: "undone", done: false, note: todo.note || "", repeat: todo.repeat, createdAt: new Date().toISOString(),
     });
@@ -95,66 +95,66 @@ export default function App() {
     : { status, done: false, doneAt: null };
 
   async function quickAdd(p) {
-    await addDoc(collection(db, "sales_todos"), {
+    await addDoc(col("sales_todos"), {
       title: p.title, date: p.date, priority: p.priority, categories: [], status: "undone", done: false,
       note: "", source: "app", createdAt: new Date().toISOString(),
     });
   }
   async function toggleTodo(t) {
     const next = isDoneTodo(t) ? "undone" : "done";
-    await updateDoc(doc(db, "sales_todos", t.id), doneFields(next));
+    await updateDoc(ref("sales_todos", t.id), doneFields(next));
     if (next === "done") await createRepeatIfNeeded(t);
   }
   async function saveTodo(f, todo) {
     const { status, ...rest } = f;
     if (todo) {
       const prev = todoStatus(todo);
-      await updateDoc(doc(db, "sales_todos", todo.id), { ...rest, ...(prev !== status ? doneFields(status) : {}) });
+      await updateDoc(ref("sales_todos", todo.id), { ...rest, ...(prev !== status ? doneFields(status) : {}) });
       if (prev !== "done" && status === "done") await createRepeatIfNeeded({ ...todo, ...rest });
       return;
     }
-    await addDoc(collection(db, "sales_todos"), { ...rest, ...doneFields(status), source: "app", createdAt: new Date().toISOString() });
+    await addDoc(col("sales_todos"), { ...rest, ...doneFields(status), source: "app", createdAt: new Date().toISOString() });
     // 初回接触・提案・クロージングを選んだら案件にも登録
     const pipe = f.categories.find((k) => PIPELINE_ACTIONS.includes(k));
     if (pipe) {
       const stage = ACTION_CATEGORIES[pipe].pipelineStage;
       const company = f.title.replace(/\s*(初回|提案|クロージング|アポ|訪問|面談|電話|TEL|折り返し).*$/, "").trim() || f.title;
       if (!deals.some((d) => d.company === company && d.stage === stage)) {
-        await addDoc(collection(db, "sales_deals"), {
+        await addDoc(col("sales_deals"), {
           company, products: f.categories.filter((k) => PRODUCT_CATEGORIES[k]), amount: "", person: "", note: "",
           stage, nextAction: "", fromTask: true, createdAt: new Date().toISOString(),
         });
       }
     }
   }
-  const deleteTodo = (t) => deleteDoc(doc(db, "sales_todos", t.id));
+  const deleteTodo = (t) => deleteDoc(ref("sales_todos", t.id));
   async function deleteDone() {
     const list = todos.filter(isDoneTodo);
     if (!list.length || !window.confirm(`完了したタスク ${list.length}件を削除しますか？`)) return;
-    await Promise.all(list.map((t) => deleteDoc(doc(db, "sales_todos", t.id))));
+    await Promise.all(list.map((t) => deleteDoc(ref("sales_todos", t.id))));
   }
 
   // ── 報告書 ─────────────────────────────────────────
-  const addReport = (name) => addDoc(collection(db, "sales_reports"), { date: today, name, createdAt: new Date().toISOString() });
-  const deleteReport = (id) => deleteDoc(doc(db, "sales_reports", id));
+  const addReport = (name) => addDoc(col("sales_reports"), { date: today, name, createdAt: new Date().toISOString() });
+  const deleteReport = (id) => deleteDoc(ref("sales_reports", id));
 
   // ── 案件 ───────────────────────────────────────────
   async function saveDeal(f, deal) {
-    if (deal) await updateDoc(doc(db, "sales_deals", deal.id), f);
-    else await addDoc(collection(db, "sales_deals"), { ...f, createdAt: new Date().toISOString() });
+    if (deal) await updateDoc(ref("sales_deals", deal.id), f);
+    else await addDoc(col("sales_deals"), { ...f, createdAt: new Date().toISOString() });
     // 次回アクション日を設定/変更したらフォロータスクを自動作成
     if (f.nextAction && f.nextAction !== (deal?.nextAction || "")) {
       const title = `${f.company} フォロー`;
       if (!todos.some((t) => t.title === title && t.date === f.nextAction)) {
-        await addDoc(collection(db, "sales_todos"), {
+        await addDoc(col("sales_todos"), {
           title, date: f.nextAction, priority: "medium", categories: ["followup"], status: "undone", done: false,
           note: "案件から自動作成", createdAt: new Date().toISOString(),
         });
       }
     }
   }
-  const deleteDeal = (d) => deleteDoc(doc(db, "sales_deals", d.id));
-  const moveDeal = (d, stage) => updateDoc(doc(db, "sales_deals", d.id), { stage });
+  const deleteDeal = (d) => deleteDoc(ref("sales_deals", d.id));
+  const moveDeal = (d, stage) => updateDoc(ref("sales_deals", d.id), { stage });
 
   // ════════════════════════════════════════════════════
   if (error) return (
@@ -215,7 +215,7 @@ export default function App() {
         {tab === "board" && (
           <BoardTab today={today} half={viewHalf} isCurrentHalf={viewHalf.id === curHalf.id} boardData={viewBoard}
             onShiftHalf={(n) => setHalfShift((s) => s + n)}
-            saveBoardData={(d) => setDoc(doc(db, "sales_board", viewHalf.id), d)} />
+            saveBoardData={(d) => setDoc(ref("sales_board", viewHalf.id), d)} />
         )}
         {tab === "pipeline" && (
           <PipelineTab deals={deals} todayStr={today}
